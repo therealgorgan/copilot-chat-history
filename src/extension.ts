@@ -375,6 +375,39 @@ function openChatInWebview(session: ChatSession, context: vscode.ExtensionContex
     }
 }
 
+async function exportChatToMarkdown(session: ChatSession): Promise<void> {
+    try {
+        if (!fs.existsSync(session.filePath)) {
+            vscode.window.showErrorMessage(`Chat session file not found: ${session.filePath}`);
+            return;
+        }
+
+        const sessionData: ChatSessionData = JSON.parse(fs.readFileSync(session.filePath, 'utf8'));
+        const markdown = buildChatMarkdown(sessionData, session);
+
+        const defaultFileName = sanitizeFileName(session.customTitle || `chat-session-${session.id}`) + '.md';
+        const defaultUri = vscode.Uri.file(path.join(os.homedir(), defaultFileName));
+
+        const saveUri = await vscode.window.showSaveDialog({
+            defaultUri,
+            filters: {
+                Markdown: ['md'],
+                'All Files': ['*']
+            }
+        });
+
+        if (!saveUri) {
+            return;
+        }
+
+        await fs.promises.writeFile(saveUri.fsPath, markdown, 'utf8');
+        vscode.window.showInformationMessage(`Chat exported to ${saveUri.fsPath}`);
+    } catch (error) {
+        console.error('Error exporting chat to markdown:', error);
+        vscode.window.showErrorMessage(`Error exporting chat: ${error}`);
+    }
+}
+
 // Функция для генерации HTML контента чата
 function generateChatHTML(sessionData: ChatSessionData, session: ChatSession): string {
     const messages = sessionData.requests || [];
@@ -773,6 +806,66 @@ function formatCodeContent(text: string): string {
     return formatted;
 }
 
+function buildChatMarkdown(sessionData: ChatSessionData, session: ChatSession): string {
+    const lines: string[] = [];
+    const title = session.customTitle || `Chat Session ${session.id}`;
+    const requester = sessionData.requesterUsername || 'User';
+    const responder = sessionData.responderUsername || 'GitHub Copilot';
+
+    lines.push(`# ${title}`);
+    lines.push('');
+    lines.push(`- **Workspace:** ${session.workspaceName}${session.workspacePath ? ` (${session.workspacePath})` : ''}`);
+    lines.push(`- **Messages:** ${session.messageCount}`);
+
+    if (sessionData.creationDate) {
+        lines.push(`- **Created:** ${new Date(sessionData.creationDate).toLocaleString()}`);
+    }
+
+    if (sessionData.lastMessageDate) {
+        lines.push(`- **Last message:** ${new Date(sessionData.lastMessageDate).toLocaleString()}`);
+    } else {
+        lines.push(`- **Last modified:** ${session.lastModified.toLocaleString()}`);
+    }
+
+    lines.push('');
+
+    const messages = sessionData.requests || [];
+    messages.forEach((request, index) => {
+        const messageNumber = index + 1;
+        if (request.message?.text?.trim()) {
+            lines.push(`## Message ${messageNumber} — ${requester}`);
+            if (request.timestamp) {
+                lines.push(`*${new Date(request.timestamp).toLocaleString()}*`);
+            }
+            lines.push('');
+            lines.push(request.message.text.trim());
+            lines.push('');
+        }
+
+        const responseText = request.response
+            ?.map(response => response.value)
+            .filter((value): value is string => Boolean(value && value.trim()))
+            .join('\n\n');
+
+        if (responseText) {
+            lines.push(`### Response ${messageNumber} — ${responder}`);
+            lines.push('');
+            lines.push(responseText.trim());
+            lines.push('');
+        }
+    });
+
+    if (lines[lines.length - 1] === '') {
+        lines.pop();
+    }
+
+    return lines.join('\n');
+}
+
+function sanitizeFileName(name: string): string {
+    return name.replace(/[\\/:*?"<>|]/g, '_').trim() || 'chat-session';
+}
+
 export function activate(context: vscode.ExtensionContext) {
     // Создаем провайдер данных
     const chatHistoryProvider = new CopilotChatHistoryProvider();
@@ -802,6 +895,10 @@ export function activate(context: vscode.ExtensionContext) {
         } else {
             vscode.window.showErrorMessage(`Chat session file not found: ${session.filePath}`);
         }
+    });
+
+    const exportChatMarkdownCommand = vscode.commands.registerCommand('copilotChatHistory.exportChatMarkdown', async (session: ChatSession) => {
+        await exportChatToMarkdown(session);
     });
 
     const helloWorldCommand = vscode.commands.registerCommand('copilotChatHistory.helloWorld', () => {
@@ -883,7 +980,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
-    context.subscriptions.push(refreshCommand, openChatCommand, openChatJsonCommand, helloWorldCommand, searchCommand, clearFilterCommand, openWorkspaceInCurrentWindowCommand, openWorkspaceInNewWindowCommand);
+    context.subscriptions.push(refreshCommand, openChatCommand, openChatJsonCommand, helloWorldCommand, searchCommand, clearFilterCommand, openWorkspaceInCurrentWindowCommand, openWorkspaceInNewWindowCommand, exportChatMarkdownCommand);
 
     // Автоматически обновляем при активации
     chatHistoryProvider.refresh();
