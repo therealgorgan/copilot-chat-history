@@ -54,14 +54,22 @@ class CopilotChatHistoryProvider implements vscode.TreeDataProvider<ChatSession 
     getTreeItem(element: ChatSession | WorkspaceGroup): vscode.TreeItem {
         if ('sessions' in element) {
             // Это группа workspace
-            const item = new vscode.TreeItem(element.workspaceName, vscode.TreeItemCollapsibleState.Collapsed);
-            item.iconPath = new vscode.ThemeIcon('folder');
-            item.description = `${element.sessions.length} sessions`;
+            const isCurrentWorkspace = this.isCurrentWorkspace(element);
+            const itemLabel = isCurrentWorkspace ? `$(star-full) ${element.workspaceName}` : element.workspaceName;
+            const item = new vscode.TreeItem(itemLabel, vscode.TreeItemCollapsibleState.Collapsed);
+            const sessionsDescription = `${element.sessions.length} sessions`;
+            item.iconPath = new vscode.ThemeIcon(isCurrentWorkspace ? 'root-folder-opened' : 'folder');
+            item.description = isCurrentWorkspace ? `Current • ${sessionsDescription}` : sessionsDescription;
             item.contextValue = 'workspaceGroup';
             item.id = `workspace-${element.workspaceName}`;
             // Добавляем resourceUri если есть путь к workspace
             if (element.workspacePath) {
                 item.resourceUri = vscode.Uri.file(element.workspacePath);
+            }
+            if (isCurrentWorkspace) {
+                item.tooltip = element.workspacePath
+                    ? `${element.workspacePath}\nCurrent workspace`
+                    : 'Current workspace';
             }
             console.log('Created workspace TreeItem:', item.label, 'contextValue:', item.contextValue);
             return item;
@@ -124,6 +132,44 @@ class CopilotChatHistoryProvider implements vscode.TreeDataProvider<ChatSession 
         });
 
         return groups.sort((a, b) => a.workspaceName.localeCompare(b.workspaceName));
+    }
+
+    private isCurrentWorkspace(group: WorkspaceGroup): boolean {
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (!workspaceFolders || workspaceFolders.length === 0) {
+            return false;
+        }
+
+        const targetPath = group.workspacePath ? this.normalizeWorkspacePath(group.workspacePath) : undefined;
+
+        for (const folder of workspaceFolders) {
+            const folderPath = this.normalizeWorkspacePath(folder.uri.fsPath);
+
+            if (targetPath) {
+                if (folderPath === targetPath) {
+                    return true;
+                }
+            } else if (folder.name === group.workspaceName) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private normalizeWorkspacePath(workspacePath: string): string {
+        let normalizedPath = workspacePath;
+        if (workspacePath.startsWith('file://')) {
+            normalizedPath = vscode.Uri.parse(workspacePath).fsPath;
+        }
+
+        normalizedPath = path.normalize(normalizedPath).replace(/[\\/]+$/, '');
+
+        if (process.platform === 'win32') {
+            return normalizedPath.toLowerCase();
+        }
+
+        return normalizedPath;
     }
 
     private async scanForChatSessions(): Promise<ChatSession[]> {
