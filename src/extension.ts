@@ -12,6 +12,7 @@ interface ChatSession {
     lastModified: Date;
     filePath: string;
     messageCount: number;
+    storageRoot: string;
 }
 
 interface WorkspaceGroup {
@@ -223,7 +224,8 @@ class CopilotChatHistoryProvider implements vscode.TreeDataProvider<ChatSession 
                                 workspacePath,
                                 lastModified: stats.mtime,
                                 filePath: sessionPath,
-                                messageCount
+                                messageCount,
+                                storageRoot: chatSessionsPath
                             });
                         } catch (error) {
                             console.error(`Error reading session file ${sessionPath}:`, error);
@@ -343,17 +345,43 @@ interface ChatSessionData {
     lastMessageDate?: number;
 }
 
+function resolveSessionFilePath(session: ChatSession): string | undefined {
+    if (!session.filePath || !session.storageRoot) {
+        console.error('Session is missing file path metadata.');
+        return undefined;
+    }
+
+    const resolvedFilePath = path.resolve(session.filePath);
+    const resolvedRoot = path.resolve(session.storageRoot);
+    const relative = path.relative(resolvedRoot, resolvedFilePath);
+
+    if (relative.startsWith('..') || path.isAbsolute(relative)) {
+        console.error(`Session file path is outside of expected directory: ${session.filePath}`);
+        return undefined;
+    }
+
+    return resolvedFilePath;
+}
+
 // Функция для открытия чата в webview
-function openChatInWebview(session: ChatSession, context: vscode.ExtensionContext) {
+async function openChatInWebview(session: ChatSession, context: vscode.ExtensionContext) {
     try {
-        // Читаем данные сессии
-        if (!fs.existsSync(session.filePath)) {
-            vscode.window.showErrorMessage(`Chat session file not found: ${session.filePath}`);
+        const sessionFilePath = resolveSessionFilePath(session);
+        if (!sessionFilePath) {
+            vscode.window.showErrorMessage('Unable to resolve chat session file path.');
             return;
         }
 
-        const sessionData: ChatSessionData = JSON.parse(fs.readFileSync(session.filePath, 'utf8'));
-        
+        try {
+            await fs.promises.access(sessionFilePath, fs.constants.R_OK);
+        } catch {
+            vscode.window.showErrorMessage(`Chat session file not found: ${sessionFilePath}`);
+            return;
+        }
+
+        const sessionRaw = await fs.promises.readFile(sessionFilePath, 'utf8');
+        const sessionData: ChatSessionData = JSON.parse(sessionRaw);
+
         // Создаем webview panel
         const panel = vscode.window.createWebviewPanel(
             'copilotChatViewer',
@@ -377,12 +405,21 @@ function openChatInWebview(session: ChatSession, context: vscode.ExtensionContex
 
 async function exportChatToMarkdown(session: ChatSession): Promise<void> {
     try {
-        if (!fs.existsSync(session.filePath)) {
-            vscode.window.showErrorMessage(`Chat session file not found: ${session.filePath}`);
+        const sessionFilePath = resolveSessionFilePath(session);
+        if (!sessionFilePath) {
+            vscode.window.showErrorMessage('Unable to resolve chat session file path.');
             return;
         }
 
-        const sessionData: ChatSessionData = JSON.parse(fs.readFileSync(session.filePath, 'utf8'));
+        try {
+            await fs.promises.access(sessionFilePath, fs.constants.R_OK);
+        } catch {
+            vscode.window.showErrorMessage(`Chat session file not found: ${sessionFilePath}`);
+            return;
+        }
+
+        const sessionRaw = await fs.promises.readFile(sessionFilePath, 'utf8');
+        const sessionData: ChatSessionData = JSON.parse(sessionRaw);
         const markdown = buildChatMarkdown(sessionData, session);
 
         const defaultFileName = sanitizeFileName(session.customTitle || `chat-session-${session.id}`) + '.md';
@@ -400,8 +437,14 @@ async function exportChatToMarkdown(session: ChatSession): Promise<void> {
             return;
         }
 
-        await fs.promises.writeFile(saveUri.fsPath, markdown, 'utf8');
-        vscode.window.showInformationMessage(`Chat exported to ${saveUri.fsPath}`);
+        if (saveUri.scheme !== 'file') {
+            vscode.window.showErrorMessage('Only file system targets are supported for exporting chat sessions.');
+            return;
+        }
+
+        const savePath = path.resolve(saveUri.fsPath);
+        await fs.promises.writeFile(savePath, markdown, 'utf8');
+        vscode.window.showInformationMessage(`Chat exported to ${savePath}`);
     } catch (error) {
         console.error('Error exporting chat to markdown:', error);
         vscode.window.showErrorMessage(`Error exporting chat: ${error}`);
@@ -881,20 +924,28 @@ export function activate(context: vscode.ExtensionContext) {
         chatHistoryProvider.refresh();
     });
 
-    const openChatCommand = vscode.commands.registerCommand('copilotChatHistory.openChat', (session: ChatSession) => {
+    const openChatCommand = vscode.commands.registerCommand('copilotChatHistory.openChat', async (session: ChatSession) => {
         // Открываем чат в специальном webview вместо JSON файла
-        openChatInWebview(session, context);
+        await openChatInWebview(session, context);
     });
 
-    const openChatJsonCommand = vscode.commands.registerCommand('copilotChatHistory.openChatJson', (session: ChatSession) => {
+    const openChatJsonCommand = vscode.commands.registerCommand('copilotChatHistory.openChatJson', async (session: ChatSession) => {
         // Открываем JSON файл сессии чата
-        if (fs.existsSync(session.filePath)) {
-            vscode.workspace.openTextDocument(session.filePath).then(doc => {
-                vscode.window.showTextDocument(doc);
-            });
-        } else {
-            vscode.window.showErrorMessage(`Chat session file not found: ${session.filePath}`);
+        const sessionFilePath = resolveSessionFilePath(session);
+        if (!sessionFilePath) {
+            vscode.window.showErrorMessage('Unable to resolve chat session file path.');
+            return;
         }
+
+        try {
+            await fs.promises.access(sessionFilePath, fs.constants.R_OK);
+        } catch {
+            vscode.window.showErrorMessage(`Chat session file not found: ${sessionFilePath}`);
+            return;
+        }
+
+        const document = await vscode.workspace.openTextDocument(sessionFilePath);
+        vscode.window.showTextDocument(document);
     });
 
     const exportChatMarkdownCommand = vscode.commands.registerCommand('copilotChatHistory.exportChatMarkdown', async (session: ChatSession) => {
