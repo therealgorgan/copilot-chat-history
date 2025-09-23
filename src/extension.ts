@@ -345,42 +345,68 @@ interface ChatSessionData {
     lastMessageDate?: number;
 }
 
-function resolveSessionFilePath(session: ChatSession): string | undefined {
+async function resolveSessionFilePath(session: ChatSession): Promise<string | undefined> {
     if (!session.filePath || !session.storageRoot) {
         console.error('Session is missing file path metadata.');
         return undefined;
     }
 
-    const resolvedFilePath = path.resolve(session.filePath);
-    const resolvedRoot = path.resolve(session.storageRoot);
-    const relative = path.relative(resolvedRoot, resolvedFilePath);
+    try {
+        const [realFilePath, realRoot] = await Promise.all([
+            fs.promises.realpath(session.filePath),
+            fs.promises.realpath(session.storageRoot)
+        ]);
 
-    if (relative.startsWith('..') || path.isAbsolute(relative)) {
-        console.error(`Session file path is outside of expected directory: ${session.filePath}`);
+        const relative = path.relative(realRoot, realFilePath);
+
+        if (relative.startsWith('..') || path.isAbsolute(relative)) {
+            console.error(`Session file path is outside of expected directory: ${session.filePath}`);
+            return undefined;
+        }
+
+        return realFilePath;
+    } catch (error) {
+        console.error('Error resolving real paths for session file or storage root:', error);
+        return undefined;
+    }
+}
+
+async function resolveAccessibleSessionFilePath(
+    session: ChatSession,
+    accessMode: number = fs.constants.R_OK
+): Promise<string | undefined> {
+    const sessionFilePath = await resolveSessionFilePath(session);
+    if (!sessionFilePath) {
+        vscode.window.showErrorMessage('Unable to resolve chat session file path.');
         return undefined;
     }
 
-    return resolvedFilePath;
+    try {
+        await fs.promises.access(sessionFilePath, accessMode);
+    } catch {
+        vscode.window.showErrorMessage(`Chat session file not found: ${sessionFilePath}`);
+        return undefined;
+    }
+
+    return sessionFilePath;
 }
 
 // Функция для открытия чата в webview
 async function openChatInWebview(session: ChatSession, context: vscode.ExtensionContext) {
     try {
-        const sessionFilePath = resolveSessionFilePath(session);
+        const sessionFilePath = await resolveAccessibleSessionFilePath(session);
         if (!sessionFilePath) {
-            vscode.window.showErrorMessage('Unable to resolve chat session file path.');
-            return;
-        }
-
-        try {
-            await fs.promises.access(sessionFilePath, fs.constants.R_OK);
-        } catch {
-            vscode.window.showErrorMessage(`Chat session file not found: ${sessionFilePath}`);
             return;
         }
 
         const sessionRaw = await fs.promises.readFile(sessionFilePath, 'utf8');
-        const sessionData: ChatSessionData = JSON.parse(sessionRaw);
+        let sessionData: ChatSessionData;
+        try {
+            sessionData = JSON.parse(sessionRaw);
+        } catch {
+            vscode.window.showErrorMessage(`Chat session file is invalid or corrupted: ${sessionFilePath}`);
+            return;
+        }
 
         // Создаем webview panel
         const panel = vscode.window.createWebviewPanel(
@@ -405,21 +431,19 @@ async function openChatInWebview(session: ChatSession, context: vscode.Extension
 
 async function exportChatToMarkdown(session: ChatSession): Promise<void> {
     try {
-        const sessionFilePath = resolveSessionFilePath(session);
+        const sessionFilePath = await resolveAccessibleSessionFilePath(session);
         if (!sessionFilePath) {
-            vscode.window.showErrorMessage('Unable to resolve chat session file path.');
-            return;
-        }
-
-        try {
-            await fs.promises.access(sessionFilePath, fs.constants.R_OK);
-        } catch {
-            vscode.window.showErrorMessage(`Chat session file not found: ${sessionFilePath}`);
             return;
         }
 
         const sessionRaw = await fs.promises.readFile(sessionFilePath, 'utf8');
-        const sessionData: ChatSessionData = JSON.parse(sessionRaw);
+        let sessionData: ChatSessionData;
+        try {
+            sessionData = JSON.parse(sessionRaw);
+        } catch {
+            vscode.window.showErrorMessage(`Chat session file is invalid or corrupted: ${sessionFilePath}`);
+            return;
+        }
         const markdown = buildChatMarkdown(sessionData, session);
 
         const defaultFileName = sanitizeFileName(session.customTitle || `chat-session-${session.id}`) + '.md';
@@ -443,6 +467,26 @@ async function exportChatToMarkdown(session: ChatSession): Promise<void> {
         }
 
         const savePath = path.resolve(saveUri.fsPath);
+        let shouldWrite = true;
+        try {
+            await fs.promises.access(savePath, fs.constants.F_OK);
+            const overwrite = await vscode.window.showWarningMessage(
+                `File "${path.basename(savePath)}" already exists. Overwrite?`,
+                { modal: true },
+                'Overwrite'
+            );
+            if (overwrite !== 'Overwrite') {
+                shouldWrite = false;
+            }
+        } catch {
+            // File does not exist; safe to write.
+        }
+
+        if (!shouldWrite) {
+            vscode.window.showInformationMessage('Export cancelled: file not overwritten.');
+            return;
+        }
+
         await fs.promises.writeFile(savePath, markdown, 'utf8');
         vscode.window.showInformationMessage(`Chat exported to ${savePath}`);
     } catch (error) {
@@ -850,63 +894,115 @@ function formatCodeContent(text: string): string {
 }
 
 function buildChatMarkdown(sessionData: ChatSessionData, session: ChatSession): string {
-    const lines: string[] = [];
-    const title = session.customTitle || `Chat Session ${session.id}`;
+    const sections: string[] = [];
+    sections.push(renderChatMetadata(sessionData, session));
+
+    const messagesSection = renderChatMessages(sessionData);
+    if (messagesSection) {
+        sections.push(messagesSection);
+    }
+
+    return sections.join('\n\n');
+}
+
+function renderChatMetadata(sessionData: ChatSessionData, session: ChatSession): string {
+    const title = escapeMarkdownInline(session.customTitle || `Chat Session ${session.id}`);
+    const workspaceName = session.workspaceName || 'Unknown workspace';
+    const workspaceLine = session.workspacePath
+        ? `${workspaceName} (${session.workspacePath})`
+        : workspaceName;
+    const messageCount = session.messageCount ?? (sessionData.requests?.length ?? 0);
+    const metadataLines: string[] = [
+        `# ${title}`,
+        '',
+        `- **Workspace:** ${escapeMarkdownInline(workspaceLine)}`,
+        `- **Messages:** ${messageCount.toString()}`
+    ];
+
+    if (sessionData.creationDate) {
+        metadataLines.push(`- **Created:** ${escapeMarkdownInline(new Date(sessionData.creationDate).toLocaleString())}`);
+    }
+
+    metadataLines.push(
+        sessionData.lastMessageDate
+            ? `- **Last message:** ${escapeMarkdownInline(new Date(sessionData.lastMessageDate).toLocaleString())}`
+            : `- **Last modified:** ${escapeMarkdownInline(session.lastModified.toLocaleString())}`
+    );
+
+    return metadataLines.join('\n');
+}
+
+function renderChatMessages(sessionData: ChatSessionData): string | undefined {
+    const messages = sessionData.requests || [];
+    if (messages.length === 0) {
+        return '_No messages in this chat session._';
+    }
+
     const requester = sessionData.requesterUsername || 'User';
     const responder = sessionData.responderUsername || 'GitHub Copilot';
 
-    lines.push(`# ${title}`);
-    lines.push('');
-    lines.push(`- **Workspace:** ${session.workspaceName}${session.workspacePath ? ` (${session.workspacePath})` : ''}`);
-    lines.push(`- **Messages:** ${session.messageCount}`);
+    const blocks = messages
+        .map((request, index) => renderChatMessageBlock(request, index, requester, responder))
+        .filter((block): block is string => Boolean(block && block.trim()));
 
-    if (sessionData.creationDate) {
-        lines.push(`- **Created:** ${new Date(sessionData.creationDate).toLocaleString()}`);
+    return blocks.join('\n\n');
+}
+
+function renderChatMessageBlock(
+    request: ChatMessage,
+    index: number,
+    requester: string,
+    responder: string
+): string | undefined {
+    const lines: string[] = [];
+    const messageNumber = index + 1;
+
+    if (request.message?.text?.trim()) {
+        lines.push(`## Message ${messageNumber} — ${escapeMarkdownInline(requester)}`);
+        if (request.timestamp) {
+            lines.push(`*${escapeMarkdownInline(new Date(request.timestamp).toLocaleString())}*`);
+        }
+        lines.push('');
+        lines.push(escapeMarkdownMultiline(request.message.text.trim()));
     }
 
-    if (sessionData.lastMessageDate) {
-        lines.push(`- **Last message:** ${new Date(sessionData.lastMessageDate).toLocaleString()}`);
-    } else {
-        lines.push(`- **Last modified:** ${session.lastModified.toLocaleString()}`);
+    const responseText = request.response
+        ?.map(response => response.value)
+        .filter((value): value is string => Boolean(value && value.trim()))
+        .join('\n\n');
+
+    if (responseText) {
+        if (lines.length > 0) {
+            lines.push('');
+        }
+        lines.push(`### Response ${messageNumber} — ${escapeMarkdownInline(responder)}`);
+        lines.push('');
+        lines.push(escapeMarkdownMultiline(responseText.trim()));
     }
 
-    lines.push('');
+    return lines.length > 0 ? lines.join('\n') : undefined;
+}
 
-    const messages = sessionData.requests || [];
-    messages.forEach((request, index) => {
-        const messageNumber = index + 1;
-        if (request.message?.text?.trim()) {
-            lines.push(`## Message ${messageNumber} — ${requester}`);
-            if (request.timestamp) {
-                lines.push(`*${new Date(request.timestamp).toLocaleString()}*`);
+function escapeMarkdownInline(text: string): string {
+    return text.replace(/([\\`*_{}\[\]()#+\-!.>|])/g, '\\$1');
+}
+
+function escapeMarkdownMultiline(text: string): string {
+    return text
+        .split('\n')
+        .map(line => {
+            if (line.trim().startsWith('```')) {
+                return line.replace(/`/g, '\\`');
             }
-            lines.push('');
-            lines.push(request.message.text.trim());
-            lines.push('');
-        }
-
-        const responseText = request.response
-            ?.map(response => response.value)
-            .filter((value): value is string => Boolean(value && value.trim()))
-            .join('\n\n');
-
-        if (responseText) {
-            lines.push(`### Response ${messageNumber} — ${responder}`);
-            lines.push('');
-            lines.push(responseText.trim());
-            lines.push('');
-        }
-    });
-
-    if (lines[lines.length - 1] === '') {
-        lines.pop();
-    }
-
-    return lines.join('\n');
+            return escapeMarkdownInline(line);
+        })
+        .join('\n');
 }
 
 function sanitizeFileName(name: string): string {
-    return name.replace(/[\\/:*?"<>|]/g, '_').trim() || 'chat-session';
+    const sanitized = name.replace(/[\\/:*?"<>|]/g, '_').trim() || 'chat-session';
+    const MAX_FILENAME_LENGTH = 255;
+    return sanitized.length > MAX_FILENAME_LENGTH ? sanitized.substring(0, MAX_FILENAME_LENGTH) : sanitized;
 }
 
 export function activate(context: vscode.ExtensionContext) {
@@ -931,21 +1027,18 @@ export function activate(context: vscode.ExtensionContext) {
 
     const openChatJsonCommand = vscode.commands.registerCommand('copilotChatHistory.openChatJson', async (session: ChatSession) => {
         // Открываем JSON файл сессии чата
-        const sessionFilePath = resolveSessionFilePath(session);
+        const sessionFilePath = await resolveAccessibleSessionFilePath(session);
         if (!sessionFilePath) {
-            vscode.window.showErrorMessage('Unable to resolve chat session file path.');
             return;
         }
 
         try {
-            await fs.promises.access(sessionFilePath, fs.constants.R_OK);
-        } catch {
-            vscode.window.showErrorMessage(`Chat session file not found: ${sessionFilePath}`);
-            return;
+            const document = await vscode.workspace.openTextDocument(sessionFilePath);
+            await vscode.window.showTextDocument(document);
+        } catch (error) {
+            console.error('Error opening chat JSON document:', error);
+            vscode.window.showErrorMessage(`Error opening chat JSON: ${error}`);
         }
-
-        const document = await vscode.workspace.openTextDocument(sessionFilePath);
-        vscode.window.showTextDocument(document);
     });
 
     const exportChatMarkdownCommand = vscode.commands.registerCommand('copilotChatHistory.exportChatMarkdown', async (session: ChatSession) => {
