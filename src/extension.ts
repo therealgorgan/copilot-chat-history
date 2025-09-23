@@ -5,6 +5,7 @@ import * as os from 'os';
 import type { ChatSession } from './types';
 import { buildChatMarkdown, sanitizeFileName } from './markdown/chatMarkdown';
 import { generateChatHTML } from './renderers/chatRenderer';
+import { getChatStyles } from './renderers/styles';
 import { showCentralizedError } from './utils/notifications';
 import { loadSessionData, resolveAccessibleSessionFilePath, SessionFileError } from './utils/sessionFiles';
 
@@ -394,7 +395,7 @@ async function openChatInWebview(session: ChatSession, context: vscode.Extension
         );
 
         // Генерируем HTML контент
-        panel.webview.html = generateChatHTML(sessionInfo.data, session);
+        panel.webview.html = generateChatHTML(sessionInfo, getChatStyles(), sessionInfo.data.responderUsername || 'Copilot');
 
     } catch (error) {
         if (error instanceof SessionFileError) {

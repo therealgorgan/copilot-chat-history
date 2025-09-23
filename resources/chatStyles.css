@@ -1,37 +1,185 @@
-/* Chat webview styling extracted from generateChatHTML */
+/* Modern Chat webview styling based on VS Code Copilot Chat */
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+    font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif);
     margin: 0;
-    padding: 16px;
+    padding: 0;
     background-color: var(--vscode-editor-background);
     color: var(--vscode-editor-foreground);
-    line-height: 1.4;
+    line-height: 1.5;
     font-size: 13px;
 }
 
+/* CSS Variables for consistent sizing */
+:root {
+    --vscode-chat-font-size-body-xs: 0.846em; /* 11px when base font is 13px */
+    --vscode-chat-font-size-body-s: 0.923em;  /* 12px when base font is 13px */
+    --vscode-chat-font-size-body-m: 1em;      /* 13px when base font is 13px */
+    --vscode-chat-font-size-body-l: 1.077em;  /* 14px when base font is 13px */
+    --vscode-chat-font-size-body-xl: 1.231em; /* 16px when base font is 13px */
+    --vscode-chat-font-size-body-xxl: 1.538em; /* 20px when base font is 13px */
+}
+
 .chat-container {
-    max-width: 900px;
+    max-width: 950px;
     margin: 0 auto;
+    position: relative;
+    background-color: var(--vscode-editor-background);
 }
 
 .chat-header {
     border-bottom: 1px solid var(--vscode-panel-border);
-    padding-bottom: 12px;
-    margin-bottom: 16px;
+    padding: 16px;
+    margin-bottom: 0;
+    background-color: var(--vscode-sideBar-background);
 }
 
 .chat-title {
-    font-size: 16px;
+    font-size: var(--vscode-chat-font-size-body-xl);
     font-weight: 600;
     margin: 0 0 4px 0;
     color: var(--vscode-editor-foreground);
+    font-family: var(--vscode-chat-font-family, inherit);
 }
 
 .chat-meta {
     color: var(--vscode-descriptionForeground);
-    font-size: 11px;
+    font-size: var(--vscode-chat-font-size-body-xs);
+    margin: 0;
 }
 
+.messages {
+    background-color: var(--vscode-editor-background);
+    position: relative;
+}
+
+/* Modern Interactive Chat Styling - Based on VS Code Copilot Chat */
+
+/* Interactive Chat Items */
+.interactive-item-container {
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    color: var(--vscode-interactive-session-foreground, var(--vscode-editor-foreground));
+    cursor: default;
+    user-select: text;
+    -webkit-user-select: text;
+    margin-bottom: 0;
+    position: relative;
+}
+
+.interactive-item-container:hover {
+    background-color: var(--vscode-list-hoverBackground);
+}
+
+/* Header with avatar and username */
+.interactive-item-container .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    margin-bottom: 8px;
+}
+
+.interactive-item-container .header .user {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 2px;
+    margin: -2px;
+}
+
+.interactive-item-container .header .username {
+    margin: 0;
+    font-size: var(--vscode-chat-font-size-body-m);
+    font-weight: 600;
+    color: var(--vscode-editor-foreground);
+    font-family: var(--vscode-chat-font-family, inherit);
+}
+
+/* Modern Avatar styling */
+.interactive-item-container .header .avatar-container {
+    display: flex;
+    pointer-events: none;
+    user-select: none;
+}
+
+.interactive-item-container .header .avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    outline: 1px solid var(--vscode-chat-requestBorder);
+    background: var(--vscode-chat-avatarBackground);
+    color: var(--vscode-chat-avatarForeground);
+    font-size: 14px;
+}
+
+.interactive-item-container .header .avatar .codicon {
+    color: var(--vscode-chat-avatarForeground) !important;
+    font-size: 14px;
+}
+
+/* Legacy avatar support */
+.avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 14px;
+    outline: 1px solid var(--vscode-chat-requestBorder);
+}
+
+.user-avatar {
+    background-color: var(--vscode-testing-iconPassed);
+    color: var(--vscode-button-foreground);
+}
+
+.copilot-avatar {
+    background-color: var(--vscode-chat-avatarBackground);
+    color: var(--vscode-chat-avatarForeground);
+}
+
+/* Message content styling */
+.interactive-item-container .value,
+.message-content {
+    width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    font-family: var(--vscode-chat-font-family, inherit);
+    font-size: var(--vscode-chat-font-size-body-m);
+    line-height: 1.5em;
+}
+
+/* Request (User) vs Response (Assistant) styling */
+.interactive-item-container.interactive-request {
+    align-items: flex-end;
+}
+
+.interactive-item-container.interactive-request .value .rendered-markdown {
+    background-color: var(--vscode-chat-requestBubbleBackground);
+    border-radius: 8px;
+    padding: 8px 12px;
+    max-width: 90%;
+    margin-left: auto;
+    width: fit-content;
+    margin-bottom: 5px;
+    position: relative;
+}
+
+.interactive-item-container.interactive-request .value .rendered-markdown:hover {
+    background-color: var(--vscode-chat-requestBubbleHoverBackground);
+}
+
+.interactive-item-container.interactive-response {
+    background-color: transparent;
+}
+
+/* Legacy message styling */
 .message {
     display: flex;
     margin-bottom: 16px;
@@ -43,34 +191,262 @@ body {
 
 .user-message {
     background-color: transparent;
+    align-items: flex-end;
+}
+
+.user-message .message-content {
+    background-color: var(--vscode-chat-requestBubbleBackground);
+    border-radius: 8px;
+    padding: 8px 12px;
+    max-width: 90%;
+    margin-left: auto;
+    width: fit-content;
+}
+
+.user-message .message-content:hover {
+    background-color: var(--vscode-chat-requestBubbleHoverBackground);
 }
 
 .copilot-message {
-    background-color: var(--vscode-chat-requestBackground, transparent);
+    background-color: transparent;
 }
 
-.avatar {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
+/* High contrast mode borders */
+.hc-black .interactive-item-container.interactive-request .value .rendered-markdown,
+.hc-light .interactive-item-container.interactive-request .value .rendered-markdown,
+.hc-black .user-message .message-content,
+.hc-light .user-message .message-content {
+    border: 1px dotted var(--vscode-focusBorder);
+}
+
+.hc-black .interactive-request,
+.hc-light .interactive-request,
+.hc-black .user-message,
+.hc-light .user-message {
+    border-left: 3px solid var(--vscode-chat-requestBorder);
+    border-right: 3px solid var(--vscode-chat-requestBorder);
+}
+
+/* Markdown content styling */
+.interactive-item-container .value .rendered-markdown,
+.message-content .rendered-markdown,
+.rendered-markdown {
+    font-family: var(--vscode-chat-font-family, inherit);
+    font-size: var(--vscode-chat-font-size-body-m);
+    line-height: 1.5em;
+}
+
+.rendered-markdown > :last-child {
+    margin-bottom: 0 !important;
+}
+
+.rendered-markdown p {
+    margin: 0 0 16px 0;
+}
+
+.rendered-markdown h1 {
+    font-size: var(--vscode-chat-font-size-body-xxl);
+    font-weight: 600;
+    margin: 16px 0 8px 0;
+    font-family: var(--vscode-chat-font-family, inherit);
+}
+
+.rendered-markdown h2 {
+    font-size: var(--vscode-chat-font-size-body-xl);
+    font-weight: 600;
+    margin: 16px 0 8px 0;
+    font-family: var(--vscode-chat-font-family, inherit);
+}
+
+.rendered-markdown h3 {
+    font-size: var(--vscode-chat-font-size-body-l);
+    font-weight: 600;
+    margin: 16px 0 8px 0;
+    font-family: var(--vscode-chat-font-family, inherit);
+}
+
+/* Code blocks and inline code */
+.rendered-markdown code,
+.rendered-markdown .monaco-tokenized-source {
+    font-family: var(--monaco-monospace-font);
+    font-size: var(--vscode-chat-font-size-body-s);
+    color: var(--vscode-textPreformat-foreground);
+    background-color: var(--vscode-textPreformat-background);
+    padding: 1px 3px;
+    border-radius: 4px;
+    white-space: pre-wrap;
+}
+
+.rendered-markdown pre {
+    background-color: var(--vscode-textCodeBlock-background);
+    border-radius: 4px;
+    padding: 8px 12px;
+    overflow-x: auto;
+    margin: 8px 0;
+}
+
+.rendered-markdown pre code {
+    background-color: transparent;
+    padding: 0;
+}
+
+/* Tables */
+.rendered-markdown table {
+    width: 100%;
+    text-align: left;
+    margin: 16px 0;
+    border-collapse: collapse;
+}
+
+.rendered-markdown table,
+.rendered-markdown table td,
+.rendered-markdown table th {
+    border: 1px solid var(--vscode-chat-requestBorder);
+    padding: 4px 6px;
+}
+
+.rendered-markdown table th {
+    background-color: var(--vscode-editorWidget-background);
+    font-weight: 600;
+}
+
+/* Links */
+.rendered-markdown a {
+    color: var(--vscode-textLink-foreground);
+    user-select: text;
+    text-decoration: none;
+}
+
+.rendered-markdown a:hover,
+.rendered-markdown a:active {
+    color: var(--vscode-textLink-activeForeground);
+    text-decoration: underline;
+}
+
+/* Blockquotes */
+.rendered-markdown blockquote {
+    margin: 16px 0;
+    padding: 8px 16px 8px 10px;
+    border-left: 5px solid var(--vscode-textBlockQuote-border);
+    background: var(--vscode-textBlockQuote-background);
+    border-radius: 2px;
+}
+
+/* Lists */
+.rendered-markdown ul {
+    padding-inline-start: 24px;
+    margin: 8px 0;
+}
+
+.rendered-markdown ol {
+    padding-inline-start: 28px;
+    margin: 8px 0;
+}
+
+.rendered-markdown li > p {
+    margin: 0;
+}
+
+.rendered-markdown li {
+    margin: 4px 0;
+}
+
+/* Images */
+.rendered-markdown img {
+    max-width: 100%;
+    border-radius: 4px;
+    margin: 8px 0;
+}
+
+/* Horizontal rules */
+.rendered-markdown hr {
+    border: none;
+    border-top: 1px solid var(--vscode-panel-border);
+    margin: 16px 0;
+}
+
+/* Empty chat state */
+.empty-chat {
     display: flex;
     align-items: center;
     justify-content: center;
-    flex-shrink: 0;
-    margin-top: 1px;
-    font-size: 12px;
-    outline: 1px solid var(--vscode-contrastBorder, transparent);
-    outline-offset: -1px;
+    height: 200px;
+    color: var(--vscode-descriptionForeground);
+    font-size: var(--vscode-chat-font-size-body-l);
+    font-style: italic;
+    text-align: center;
+    padding: 40px 20px;
 }
 
-.user-avatar {
-    background-color: var(--vscode-testing-iconPassed);
-    color: var(--vscode-button-foreground);
+/* Responsive design */
+@media (max-width: 600px) {
+    body {
+        padding: 0;
+    }
+
+    .chat-container {
+        max-width: 100%;
+    }
+
+    .chat-header {
+        padding: 12px;
+    }
+
+    .interactive-item-container {
+        padding: 8px 12px;
+    }
+
+    .message {
+        padding: 6px 12px;
+        gap: 6px;
+    }
+
+    .avatar,
+    .interactive-item-container .header .avatar {
+        width: 20px;
+        height: 20px;
+        font-size: 12px;
+    }
+
+    .interactive-item-container .value,
+    .message-content {
+        font-size: var(--vscode-chat-font-size-body-s);
+    }
+
+    .interactive-item-container.interactive-request .value .rendered-markdown,
+    .user-message .message-content {
+        max-width: 95%;
+        padding: 6px 10px;
+    }
 }
 
-.copilot-avatar {
-    background-color: var(--vscode-button-secondaryBackground);
-    color: var(--vscode-button-secondaryForeground);
+/* Dark theme adjustments */
+.vs-dark .rendered-markdown hr {
+    border-color: rgba(255, 255, 255, 0.18);
+}
+
+.vs .rendered-markdown hr {
+    border-color: rgba(0, 0, 0, 0.18);
+}
+
+/* Focus and accessibility */
+.interactive-item-container:focus-within {
+    background-color: var(--vscode-list-focusBackground);
+}
+
+.message:focus-within {
+    background-color: var(--vscode-list-focusBackground);
+}
+
+/* Selection styling */
+::selection {
+    background-color: var(--vscode-editor-selectionBackground);
+    color: var(--vscode-editor-selectionForeground);
+}
+
+::-moz-selection {
+    background-color: var(--vscode-editor-selectionBackground);
+    color: var(--vscode-editor-selectionForeground);
 }
 
 .message-body {
@@ -243,14 +619,6 @@ body {
 .messages a:hover {
     color: var(--vscode-textLink-activeForeground);
     text-decoration: underline;
-}
-
-.empty-chat {
-    text-align: center;
-    color: var(--vscode-descriptionForeground);
-    padding: 40px 20px;
-    font-style: italic;
-    font-size: 13px;
 }
 
 @media (max-width: 600px) {
