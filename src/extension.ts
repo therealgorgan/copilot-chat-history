@@ -2,7 +2,14 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
-import type { ChatSession, ChatSessionData } from './types';
+import type {
+    ChatCommandRun,
+    ChatFileChange,
+    ChatMessage,
+    ChatSession,
+    ChatSessionData,
+    ChatToolInvocation
+} from './types';
 import { buildChatMarkdown, sanitizeFileName } from './markdown/chatMarkdown';
 import { showCentralizedError } from './utils/notifications';
 import { loadSessionData, resolveAccessibleSessionFilePath, SessionFileError } from './utils/sessionFiles';
@@ -474,45 +481,19 @@ function generateChatHTML(sessionData: ChatSessionData, session: ChatSession): s
     const messages = sessionData.requests || [];
     
     let messagesHtml = '';
-    
+
     messages.forEach((request, index) => {
-        // Сообщение пользователя
-        if (request.message && request.message.text) {
-            messagesHtml += `
-                <div class="message user-message">
-                    <div class="avatar user-avatar">
-                        <svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
-                            <path d="M16 7.992C16 3.58 12.416 0 8 0S0 3.58 0 7.992c0 2.43 1.104 4.62 2.832 6.09.016.016.032.016.032.032.144.112.288.224.448.336.08.048.144.111.224.175A7.98 7.98 0 0 0 8.016 16a7.98 7.98 0 0 0 4.48-1.375c.08-.048.144-.111.224-.16.144-.111.304-.223.448-.335.016-.016.032-.016.032-.032 1.696-1.487 2.8-3.676 2.8-6.106zm-8 7.001c-1.504 0-2.88-.48-4.016-1.279.016-.128.048-.255.08-.383a4.17 4.17 0 0 1 .416-.991c.176-.304.384-.576.64-.816.24-.24.528-.463.816-.639.304-.176.624-.304.976-.4A4.15 4.15 0 0 1 8 10.342a4.185 4.185 0 0 1 2.928 1.166c.368.368.656.8.864 1.295.112.288.192.592.24.911A7.03 7.03 0 0 1 8 15.993zm4.928-2.272A5.03 5.03 0 0 0 8 9.297c-1.311 0-2.513.541-3.584 1.406-.08-.48-.336-.927-.65-1.25a2.97 2.97 0 0 0-.88-.687 3.99 3.99 0 0 1-.04-5.483c.48-.48 1.072-.816 1.712-1.02C4.9 2.034 5.472 1.917 6.08 1.917a3.99 3.99 0 0 1 3.904 3.304c.016.111.048.209.048.329 0 .662-.336 1.243-.864 1.59-.528.346-.864.927-.864 1.589 0 .662.336 1.243.864 1.59.528.346.864.927.864 1.589z"/>
-                        </svg>
-                    </div>
-                    <div class="message-body">
-                        <div class="message-header">
-                            <div class="username">${sessionData.requesterUsername || 'User'}</div>
-                        </div>
-                        <div class="message-content">${escapeHtml(request.message.text)}</div>
-                    </div>
-                </div>
-            `;
+        const requesterName = sessionData.requesterUsername || 'User';
+        const responderName = sessionData.responderUsername || 'GitHub Copilot';
+
+        const userMessageHtml = renderUserMessage(request, requesterName);
+        if (userMessageHtml) {
+            messagesHtml += userMessageHtml;
         }
-        
-        // Ответ Copilot
-        if (request.response && request.response.length > 0) {
-            const responseText = request.response.map(r => r.value).join('\n');
-            messagesHtml += `
-                <div class="message copilot-message">
-                    <div class="avatar copilot-avatar">
-                        <svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
-                            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
-                        </svg>
-                    </div>
-                    <div class="message-body">
-                        <div class="message-header">
-                            <div class="username">${sessionData.responderUsername || 'GitHub Copilot'}</div>
-                        </div>
-                        <div class="message-content">${formatCodeContent(responseText)}</div>
-                    </div>
-                </div>
-            `;
+
+        const assistantMessageHtml = renderAssistantMessage(request, responderName);
+        if (assistantMessageHtml) {
+            messagesHtml += assistantMessageHtml;
         }
     });
 
@@ -625,11 +606,104 @@ function generateChatHTML(sessionData: ChatSessionData, session: ChatSession): s
                     color: var(--vscode-editor-foreground);
                     font-size: 13px;
                     line-height: 1.4;
-                    white-space: pre-wrap;
                     word-wrap: break-word;
                     overflow-wrap: break-word;
                     -webkit-user-select: text;
                     user-select: text;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 12px;
+                }
+
+                .message-paragraph {
+                    margin: 0;
+                    white-space: pre-wrap;
+                }
+
+                .message-section {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 8px;
+                    margin: 0;
+                }
+
+                .section-title {
+                    font-size: 11px;
+                    font-weight: 600;
+                    letter-spacing: 0.04em;
+                    text-transform: uppercase;
+                    color: var(--vscode-descriptionForeground);
+                }
+
+                .section-subtitle {
+                    font-weight: 600;
+                    color: var(--vscode-editor-foreground);
+                }
+
+                .detail-block {
+                    border: 1px solid var(--vscode-panel-border);
+                    border-radius: 4px;
+                    padding: 8px 10px;
+                    background-color: var(--vscode-editor-background);
+                }
+
+                .detail-block + .detail-block {
+                    margin-top: 8px;
+                }
+
+                .detail-title {
+                    font-weight: 600;
+                    margin-bottom: 6px;
+                    color: var(--vscode-editor-foreground);
+                }
+
+                .detail-grid {
+                    display: grid;
+                    grid-template-columns: minmax(120px, 160px) 1fr;
+                    gap: 4px 12px;
+                    font-size: 12px;
+                }
+
+                .detail-key {
+                    color: var(--vscode-descriptionForeground);
+                }
+
+                .detail-value {
+                    color: var(--vscode-editor-foreground);
+                    white-space: pre-wrap;
+                    word-break: break-word;
+                }
+
+                .message-pre {
+                    margin: 0;
+                    padding: 8px;
+                    border-radius: 4px;
+                    border: 1px solid var(--vscode-panel-border);
+                    background-color: var(--vscode-editor-background);
+                    font-family: var(--vscode-editor-font-family, 'SFMono-Regular', Consolas, 'Liberation Mono', monospace);
+                    font-size: 12px;
+                    white-space: pre-wrap;
+                }
+
+                details {
+                    border: 1px solid var(--vscode-panel-border);
+                    border-radius: 4px;
+                    padding: 8px 10px;
+                    background-color: var(--vscode-editor-background);
+                }
+
+                details + details {
+                    margin-top: 8px;
+                }
+
+                summary {
+                    cursor: pointer;
+                    font-weight: 600;
+                    color: var(--vscode-textLink-foreground);
+                }
+
+                .raw-json pre {
+                    margin: 0;
                 }
                 
                 /* Markdown стили */
@@ -863,8 +937,634 @@ function formatCodeContent(text: string): string {
     
     // Очистка пустых абзацев
     formatted = formatted.replace(/<p>\s*<\/p>/g, '');
-    
+
     return formatted;
+}
+
+function renderUserMessage(request: ChatMessage, requesterName: string): string | undefined {
+    const userText = request.message?.text;
+    if (!userText || userText.trim() === '') {
+        return undefined;
+    }
+
+    return `
+        <div class="message user-message">
+            <div class="avatar user-avatar">
+                <svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
+                    <path d="M16 7.992C16 3.58 12.416 0 8 0S0 3.58 0 7.992c0 2.43 1.104 4.62 2.832 6.09.016.016.032.016.032.032.144.112.288.224.448.336.08.048.144.111.224.175A7.98 7.98 0 0 0 8.016 16a7.98 7.98 0 0 0 4.48-1.375c.08-.048.144-.111.224-.16.144-.111.304-.223.448-.335.016-.016.032-.016.032-.032 1.696-1.487 2.8-3.676 2.8-6.106zm-8 7.001c-1.504 0-2.88-.48-4.016-1.279-.128.048-.255.08-.383.128a4.17 4.17 0 0 1 .416-.991c.176-.304.384-.576.64-.816.24-.24.528-.463.816-.639.304-.176.624-.304.976-.4A4.15 4.15 0 0 1 8 10.342a4.185 4.185 0 0 1 2.928 1.166c.368.368.656.8.864 1.295.112.288.192.592.24.911A7.03 7.03 0 0 1 8 15.993zm4.928-2.272A5.03 5.03 0 0 0 8 9.297c-1.311 0-2.513.541-3.584 1.406-.08-.48-.336-.927-.65-1.25a2.97 2.97 0 0 0-.88-.687 3.99 3.99 0 0 1-.04-5.483c.48-.48 1.072-.816 1.712-1.02C4.9 2.034 5.472 1.917 6.08 1.917a3.99 3.99 0 0 1 3.904 3.304c.016.111.048.209.048.329 0 .662-.336 1.243-.864 1.59-.528.346-.864.927-.864 1.589 0 .662.336 1.243.864 1.59.528.346.864.927.864 1.589z"/>
+                </svg>
+            </div>
+            <div class="message-body">
+                <div class="message-header">
+                    <div class="username">${escapeHtml(requesterName)}</div>
+                </div>
+                <div class="message-content">
+                    ${renderParagraph(userText)}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function renderAssistantMessage(request: ChatMessage, responderName: string): string | undefined {
+    const sections = buildAssistantSections(request);
+    if (sections.length === 0) {
+        return undefined;
+    }
+
+    return `
+        <div class="message copilot-message">
+            <div class="avatar copilot-avatar">
+                <svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
+                    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49 0-.5-.17-.82-.37-.98-1.23-.14-2.52-.6-3.49-1.42-.79-.68-1.3-1.6-1.3-2.71 0-2.04 1.64-3.68 3.68-3.68.89 0 1.72.33 2.38.94.66-.61 1.49-.94 2.38-.94 2.04 0 3.68 1.64 3.68 3.68 0 1.11-.51 2.03-1.3 2.71-.97.82-2.26 1.28-3.49 1.42-.2.16-.37.48-.37.98 0 .67-.01 1.3-.01 1.49 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+                </svg>
+            </div>
+            <div class="message-body">
+                <div class="message-header">
+                    <div class="username">${escapeHtml(responderName)}</div>
+                </div>
+                <div class="message-content">
+                    ${sections.join('')}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function buildAssistantSections(request: ChatMessage): string[] {
+    const sections: string[] = [];
+
+    const textSection = renderAssistantTextSection(request);
+    if (textSection) {
+        sections.push(textSection);
+    }
+
+    const fileSection = renderFileChangesSection(collectFileChanges(request));
+    if (fileSection) {
+        sections.push(fileSection);
+    }
+
+    const commandsSection = renderCommandRunsSection(collectCommandRuns(request));
+    if (commandsSection) {
+        sections.push(commandsSection);
+    }
+
+    const toolsSection = renderToolInvocationsSection(collectToolInvocations(request));
+    if (toolsSection) {
+        sections.push(toolsSection);
+    }
+
+    const additionalSection = renderAdditionalDataSection(request);
+    if (additionalSection) {
+        sections.push(additionalSection);
+    }
+
+    return sections;
+}
+
+function renderAssistantTextSection(request: ChatMessage): string | undefined {
+    const fragments: string[] = [];
+
+    (request.response ?? []).forEach(item => {
+        const value = typeof item.value === 'string' ? item.value.trim() : '';
+        if (!value) {
+            return;
+        }
+
+        const languageId = typeof item.languageId === 'string' ? item.languageId : undefined;
+        fragments.push(renderValueAsHtml(value, languageId));
+    });
+
+    if (fragments.length === 0) {
+        return undefined;
+    }
+
+    return `<div class="message-section">${fragments.join('')}</div>`;
+}
+
+function collectCommandRuns(request: ChatMessage): ChatCommandRun[] {
+    const runs: ChatCommandRun[] = [];
+    const seen = new Set<string>();
+
+    const addRun = (run: ChatCommandRun | undefined) => {
+        if (!run) {
+            return;
+        }
+
+        const normalized: ChatCommandRun = {
+            title: typeof run.title === 'string' ? run.title : undefined,
+            command: typeof run.command === 'string' ? run.command : undefined,
+            arguments: run.arguments,
+            result: run.result,
+            status: typeof run.status === 'string' ? run.status : undefined,
+            output: typeof run.output === 'string' ? run.output : undefined,
+            timestamp: typeof run.timestamp === 'number' ? run.timestamp : undefined
+        };
+
+        const key = JSON.stringify(normalized, Object.keys(normalized).sort());
+        if (seen.has(key)) {
+            return;
+        }
+        seen.add(key);
+        runs.push(normalized);
+    };
+
+    (request.commandRuns ?? []).forEach(addRun);
+
+    (request.response ?? []).forEach(item => {
+        const responseRuns = item.commandRuns;
+        if (Array.isArray(responseRuns)) {
+            responseRuns.forEach(addRun);
+        }
+
+        if (
+            typeof item.command === 'string' ||
+            typeof item.title === 'string' ||
+            item.arguments !== undefined ||
+            item.result !== undefined ||
+            item.output !== undefined ||
+            typeof item.status === 'string'
+        ) {
+            addRun({
+                title: typeof item.title === 'string' ? item.title : undefined,
+                command: typeof item.command === 'string' ? item.command : undefined,
+                arguments: item.arguments,
+                result: item.result,
+                status: typeof item.status === 'string' ? item.status : undefined,
+                output: typeof item.output === 'string' ? item.output : undefined
+            });
+        }
+    });
+
+    return runs;
+}
+
+function collectToolInvocations(request: ChatMessage): ChatToolInvocation[] {
+    const invocations: ChatToolInvocation[] = [];
+    const seen = new Set<string>();
+
+    const addInvocation = (invocation: ChatToolInvocation | undefined) => {
+        if (!invocation) {
+            return;
+        }
+
+        const normalized: ChatToolInvocation = {
+            toolName: typeof invocation.toolName === 'string' ? invocation.toolName : undefined,
+            name: typeof invocation.name === 'string' ? invocation.name : undefined,
+            status: typeof invocation.status === 'string' ? invocation.status : undefined,
+            input: invocation.input ?? invocation.arguments,
+            result: invocation.result,
+            output: invocation.output,
+            error: invocation.error,
+            metadata: invocation.metadata,
+            startTime: typeof invocation.startTime === 'number' ? invocation.startTime : undefined,
+            endTime: typeof invocation.endTime === 'number' ? invocation.endTime : undefined
+        };
+
+        const key = JSON.stringify(normalized, Object.keys(normalized).sort());
+        if (seen.has(key)) {
+            return;
+        }
+        seen.add(key);
+        invocations.push(normalized);
+    };
+
+    (request.toolInvocations ?? []).forEach(addInvocation);
+
+    (request.response ?? []).forEach(item => {
+        const responseInvocations = item.toolInvocations;
+        if (Array.isArray(responseInvocations)) {
+            responseInvocations.forEach(addInvocation);
+        }
+
+        if (typeof item.toolInvocations === 'object' && !Array.isArray(item.toolInvocations) && item.toolInvocations !== null) {
+            addInvocation(item.toolInvocations as ChatToolInvocation);
+        }
+
+        if (typeof (item as { toolName?: unknown }).toolName === 'string' || typeof (item as { toolId?: unknown }).toolId === 'string') {
+            const anyItem = item as Record<string, unknown>;
+            addInvocation({
+                toolName: typeof anyItem.toolName === 'string' ? (anyItem.toolName as string) : (typeof anyItem.toolId === 'string' ? (anyItem.toolId as string) : undefined),
+                name: typeof anyItem.name === 'string' ? (anyItem.name as string) : undefined,
+                status: typeof anyItem.status === 'string' ? (anyItem.status as string) : undefined,
+                input: anyItem.input ?? anyItem.arguments,
+                result: anyItem.result,
+                output: anyItem.output,
+                error: anyItem.error,
+                metadata: typeof anyItem.metadata === 'object' ? (anyItem.metadata as Record<string, unknown>) : undefined
+            });
+        }
+    });
+
+    return invocations;
+}
+
+function collectFileChanges(request: ChatMessage): ChatFileChange[] {
+    const changes: ChatFileChange[] = [];
+    const seen = new Set<string>();
+
+    const addChange = (change: ChatFileChange | undefined) => {
+        if (!change) {
+            return;
+        }
+
+        const normalized: ChatFileChange = {
+            path: typeof change.path === 'string' ? change.path : undefined,
+            uri: typeof change.uri === 'string' ? change.uri : undefined,
+            diff: typeof change.diff === 'string' ? change.diff : undefined,
+            content: typeof change.content === 'string' ? change.content : undefined,
+            explanation: typeof change.explanation === 'string' ? change.explanation : undefined,
+            languageId: typeof change.languageId === 'string' ? change.languageId : undefined
+        };
+
+        if (!normalized.diff && !normalized.content && !normalized.explanation) {
+            return;
+        }
+
+        const key = JSON.stringify(normalized, Object.keys(normalized).sort());
+        if (seen.has(key)) {
+            return;
+        }
+        seen.add(key);
+        changes.push(normalized);
+    };
+
+    (request.fileChanges ?? []).forEach(addChange);
+
+    (request.response ?? []).forEach(item => {
+        const responseChanges = item.fileChanges;
+        if (Array.isArray(responseChanges)) {
+            responseChanges.forEach(addChange);
+        }
+
+        const responseEdits = (item as { fileEdits?: unknown }).fileEdits;
+        if (Array.isArray(responseEdits)) {
+            (responseEdits as ChatFileChange[]).forEach(addChange);
+        }
+
+        const responseFiles = item.files;
+        if (Array.isArray(responseFiles)) {
+            responseFiles.forEach(addChange);
+        }
+
+        const anyItem = item as Record<string, unknown>;
+        if (typeof anyItem.path === 'string' || typeof anyItem.diff === 'string' || typeof anyItem.content === 'string') {
+            addChange({
+                path: typeof anyItem.path === 'string' ? (anyItem.path as string) : undefined,
+                diff: typeof anyItem.diff === 'string' ? (anyItem.diff as string) : undefined,
+                content: typeof anyItem.content === 'string' ? (anyItem.content as string) : undefined,
+                explanation: typeof anyItem.explanation === 'string' ? (anyItem.explanation as string) : undefined,
+                languageId: typeof item.languageId === 'string' ? item.languageId : undefined
+            });
+        }
+    });
+
+    return changes;
+}
+
+function renderFileChangesSection(changes: ChatFileChange[]): string | undefined {
+    if (changes.length === 0) {
+        return undefined;
+    }
+
+    const blocks = changes.map((change, index) => {
+        const parts: string[] = [];
+        const label = change.path || change.uri || `Change ${index + 1}`;
+        parts.push(`<div class="section-subtitle">${escapeHtml(label)}</div>`);
+
+        if (change.explanation) {
+            parts.push(renderParagraph(change.explanation));
+        }
+
+        const codeContent = change.diff ?? change.content;
+        if (codeContent) {
+            const languageId = change.languageId || (change.diff ? 'diff' : undefined);
+            parts.push(renderValueAsHtml(codeContent, languageId));
+        }
+
+        return `<div class="detail-block">${parts.join('')}</div>`;
+    });
+
+    return `
+        <div class="message-section">
+            <div class="section-title">File changes</div>
+            ${blocks.join('')}
+        </div>
+    `;
+}
+
+function renderCommandRunsSection(runs: ChatCommandRun[]): string | undefined {
+    const entries = runs
+        .map((run, index) => {
+            const rows: Array<[string, unknown]> = [];
+            if (run.command) {
+                rows.push(['Command', run.command]);
+            }
+            if (run.arguments !== undefined) {
+                rows.push(['Arguments', run.arguments]);
+            }
+            if (run.status) {
+                rows.push(['Status', run.status]);
+            }
+            if (run.result !== undefined) {
+                rows.push(['Result', run.result]);
+            }
+            if (run.timestamp !== undefined) {
+                const timestamp = formatTimestamp(run.timestamp);
+                if (timestamp) {
+                    rows.push(['Timestamp', timestamp]);
+                }
+            }
+
+            const details = renderDetailRows(rows);
+            const output = typeof run.output === 'string' && run.output.trim()
+                ? `<pre class="message-pre">${escapeHtml(run.output)}</pre>`
+                : '';
+
+            if (!details && !output) {
+                return '';
+            }
+
+            const title = run.title || run.command || `Command ${index + 1}`;
+            return `<div class="detail-block">${title ? `<div class="detail-title">${escapeHtml(title)}</div>` : ''}${details}${output}</div>`;
+        })
+        .filter((entry): entry is string => Boolean(entry && entry.trim()));
+
+    if (entries.length === 0) {
+        return undefined;
+    }
+
+    return `
+        <div class="message-section">
+            <div class="section-title">Executed commands</div>
+            ${entries.join('')}
+        </div>
+    `;
+}
+
+function renderToolInvocationsSection(invocations: ChatToolInvocation[]): string | undefined {
+    const entries = invocations
+        .map((invocation, index) => {
+            const rows: Array<[string, unknown]> = [];
+            const title = invocation.toolName || invocation.name || `Tool invocation ${index + 1}`;
+
+            if (invocation.toolName && invocation.name && invocation.toolName !== invocation.name) {
+                rows.push(['Name', invocation.name]);
+            }
+
+            if (invocation.status) {
+                rows.push(['Status', invocation.status]);
+            }
+
+            if (invocation.startTime !== undefined) {
+                const started = formatTimestamp(invocation.startTime);
+                if (started) {
+                    rows.push(['Started', started]);
+                }
+            }
+
+            if (invocation.endTime !== undefined) {
+                const ended = formatTimestamp(invocation.endTime);
+                if (ended) {
+                    rows.push(['Completed', ended]);
+                }
+            }
+
+            if (invocation.input !== undefined) {
+                rows.push(['Input', invocation.input]);
+            }
+
+            if (invocation.result !== undefined) {
+                rows.push(['Result', invocation.result]);
+            }
+
+            if (invocation.metadata !== undefined) {
+                rows.push(['Metadata', invocation.metadata]);
+            }
+
+            const details = renderDetailRows(rows);
+
+            const body: string[] = [];
+            if (title) {
+                body.push(`<div class="detail-title">${escapeHtml(title)}</div>`);
+            }
+
+            if (details) {
+                body.push(details);
+            }
+
+            if (invocation.output !== undefined) {
+                body.push(formatStructuredOutput(invocation.output));
+            }
+
+            if (invocation.error !== undefined) {
+                body.push(`<div class="detail-grid"><div class="detail-key">Error</div><div class="detail-value">${formatStructuredValue(invocation.error)}</div></div>`);
+            }
+
+            if (body.length === 1 && body[0] === '') {
+                return '';
+            }
+
+            return `<div class="detail-block">${body.join('')}</div>`;
+        })
+        .filter((entry): entry is string => Boolean(entry && entry.trim()));
+
+    if (entries.length === 0) {
+        return undefined;
+    }
+
+    return `
+        <div class="message-section">
+            <div class="section-title">Tool invocations</div>
+            ${entries.join('')}
+        </div>
+    `;
+}
+
+function renderAdditionalDataSection(request: ChatMessage): string | undefined {
+    const extraSections: string[] = [];
+    const requestKnownKeys = new Set(['message', 'response', 'commandRuns', 'toolInvocations', 'fileChanges', 'timestamp']);
+    const requestExtra = extractAdditionalData(request, requestKnownKeys);
+    if (requestExtra) {
+        extraSections.push(`<details open><summary>Request metadata</summary>${requestExtra}</details>`);
+    }
+
+    const responseKnownKeys = new Set([
+        'type',
+        'kind',
+        'mimeType',
+        'languageId',
+        'value',
+        'title',
+        'command',
+        'arguments',
+        'result',
+        'output',
+        'status',
+        'commandRuns',
+        'toolInvocations',
+        'fileChanges',
+        'fileEdits',
+        'files',
+        'path',
+        'uri',
+        'diff',
+        'content',
+        'explanation'
+    ]);
+
+    (request.response ?? []).forEach((item, index) => {
+        const extra = extractAdditionalData(item, responseKnownKeys);
+        if (extra) {
+            extraSections.push(`<details><summary>Response item ${index + 1}</summary>${extra}</details>`);
+        }
+    });
+
+    if (extraSections.length === 0) {
+        return undefined;
+    }
+
+    return `
+        <div class="message-section">
+            <div class="section-title">Additional data</div>
+            ${extraSections.join('')}
+        </div>
+    `;
+}
+
+function extractAdditionalData(value: unknown, knownKeys: Set<string>): string | undefined {
+    if (!value || typeof value !== 'object') {
+        return undefined;
+    }
+
+    const entries = Object.entries(value as Record<string, unknown>).filter(([key, itemValue]) => {
+        return !knownKeys.has(key) && itemValue !== undefined;
+    });
+
+    if (entries.length === 0) {
+        return undefined;
+    }
+
+    const data = Object.fromEntries(entries);
+    return formatJsonValue(data);
+}
+
+function renderDetailRows(rows: Array<[string, unknown]>): string {
+    const cells = rows
+        .map(([label, value]) => {
+            const formatted = formatDetailValue(value);
+            if (!formatted) {
+                return undefined;
+            }
+            return `<div class="detail-key">${escapeHtml(label)}</div><div class="detail-value">${formatted}</div>`;
+        })
+        .filter((cell): cell is string => Boolean(cell));
+
+    if (cells.length === 0) {
+        return '';
+    }
+
+    return `<div class="detail-grid">${cells.join('')}</div>`;
+}
+
+function formatDetailValue(value: unknown): string | undefined {
+    if (value === undefined || value === null) {
+        return undefined;
+    }
+
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (!trimmed) {
+            return undefined;
+        }
+        return escapeHtml(trimmed);
+    }
+
+    if (typeof value === 'number' || typeof value === 'boolean') {
+        return escapeHtml(String(value));
+    }
+
+    return formatStructuredValue(value);
+}
+
+function formatStructuredValue(value: unknown): string {
+    if (typeof value === 'string') {
+        return escapeHtml(value);
+    }
+
+    if (typeof value === 'number' || typeof value === 'boolean') {
+        return escapeHtml(String(value));
+    }
+
+    if (value === null) {
+        return '<em>null</em>';
+    }
+
+    return formatJsonValue(value);
+}
+
+function formatStructuredOutput(value: unknown): string {
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (!trimmed) {
+            return '';
+        }
+        return `<pre class="message-pre">${escapeHtml(trimmed)}</pre>`;
+    }
+
+    return formatJsonValue(value);
+}
+
+function formatJsonValue(value: unknown): string {
+    let json: string;
+    try {
+        json = JSON.stringify(value, null, 2);
+    } catch (error) {
+        json = String(value);
+    }
+
+    return `<div class="raw-json"><pre class="message-pre"><code class="language-json">${escapeHtml(json)}</code></pre></div>`;
+}
+
+function renderParagraph(text: string): string {
+    return `<div class="message-paragraph">${escapeHtml(text)}</div>`;
+}
+
+function renderValueAsHtml(value: string, languageId?: string): string {
+    if (languageId && !['markdown', 'plaintext', 'text'].includes(languageId)) {
+        const sanitizedLanguage = escapeLanguageId(languageId);
+        return `<pre><code class="language-${sanitizedLanguage}">${escapeHtml(value)}</code></pre>`;
+    }
+
+    const formatted = formatCodeContent(value);
+    return ensureParagraphWrapper(formatted);
+}
+
+function ensureParagraphWrapper(content: string): string {
+    const blockIndicators = ['<pre', '<table', '<ol', '<ul', '<h1', '<h2', '<h3', '<blockquote', '<hr'];
+    if (blockIndicators.some(indicator => content.includes(indicator))) {
+        return content;
+    }
+
+    return `<div class="message-paragraph">${content}</div>`;
+}
+
+function escapeLanguageId(languageId: string): string {
+    const sanitized = languageId.replace(/[^a-zA-Z0-9_-]+/g, '-');
+    return sanitized || 'text';
+}
+
+function formatTimestamp(value: number | undefined): string | undefined {
+    if (value === undefined) {
+        return undefined;
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return undefined;
+    }
+
+    return date.toLocaleString();
 }
 
 export function activate(context: vscode.ExtensionContext) {
