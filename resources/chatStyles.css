@@ -94,37 +94,54 @@ body {
 .message-content {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 14px;
     font-size: 13px;
     color: var(--vscode-editor-foreground);
 }
 
-.message-section {
-    background-color: var(--vscode-chat-slashCommandBackground);
-    border-radius: 6px;
-    padding: 12px;
-    margin: 8px 0;
-    border: 1px solid var(--vscode-panel-border);
+.message-markdown {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
 
-.section-title {
+.metadata-section {
+    margin: 12px 0;
+    padding-left: 12px;
+    border-left: 2px solid var(--vscode-panel-border);
+}
+
+.metadata-title {
     font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
     font-weight: 600;
     margin-bottom: 8px;
     color: var(--vscode-descriptionForeground);
 }
 
-.section-subtitle {
+.metadata-subtitle {
     font-size: 12px;
     font-weight: 600;
     margin-bottom: 4px;
     color: var(--vscode-editor-foreground);
 }
 
+.metadata-block {
+    margin-bottom: 12px;
+}
+
 .detail-block {
-    margin-bottom: 10px;
+    margin-bottom: 12px;
+}
+
+.metadata-section details {
+    margin-bottom: 8px;
+}
+
+.metadata-section summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--vscode-editor-foreground);
+    margin-bottom: 4px;
 }
 
 .detail-title {
