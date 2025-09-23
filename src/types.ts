@@ -59,7 +59,6 @@ export interface ChatResponseItem {
     fileChanges?: ChatFileChange[];
     fileEdits?: ChatFileChange[];
     files?: ChatFileChange[];
-    [key: string]: unknown;
 }
 
 export interface ChatMessage {
