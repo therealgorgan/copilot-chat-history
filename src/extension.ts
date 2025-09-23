@@ -391,20 +391,39 @@ async function resolveAccessibleSessionFilePath(
     return sessionFilePath;
 }
 
+async function loadSessionData(
+    session: ChatSession
+): Promise<{ filePath: string; data: ChatSessionData } | undefined> {
+    const sessionFilePath = await resolveAccessibleSessionFilePath(session);
+    if (!sessionFilePath) {
+        return undefined;
+    }
+
+    let sessionRaw: string;
+    try {
+        sessionRaw = await fs.promises.readFile(sessionFilePath, 'utf8');
+    } catch (error) {
+        console.error('Error reading chat session file:', error);
+        vscode.window.showErrorMessage(`Unable to read chat session file: ${sessionFilePath}`);
+        return undefined;
+    }
+
+    let sessionData: ChatSessionData;
+    try {
+        sessionData = JSON.parse(sessionRaw);
+    } catch {
+        vscode.window.showErrorMessage(`Chat session file is invalid or corrupted: ${sessionFilePath}`);
+        return undefined;
+    }
+
+    return { filePath: sessionFilePath, data: sessionData };
+}
+
 // Функция для открытия чата в webview
 async function openChatInWebview(session: ChatSession, context: vscode.ExtensionContext) {
     try {
-        const sessionFilePath = await resolveAccessibleSessionFilePath(session);
-        if (!sessionFilePath) {
-            return;
-        }
-
-        const sessionRaw = await fs.promises.readFile(sessionFilePath, 'utf8');
-        let sessionData: ChatSessionData;
-        try {
-            sessionData = JSON.parse(sessionRaw);
-        } catch {
-            vscode.window.showErrorMessage(`Chat session file is invalid or corrupted: ${sessionFilePath}`);
+        const sessionInfo = await loadSessionData(session);
+        if (!sessionInfo) {
             return;
         }
 
@@ -421,7 +440,7 @@ async function openChatInWebview(session: ChatSession, context: vscode.Extension
         );
 
         // Генерируем HTML контент
-        panel.webview.html = generateChatHTML(sessionData, session);
+        panel.webview.html = generateChatHTML(sessionInfo.data, session);
 
     } catch (error) {
         console.error('Error opening chat in webview:', error);
@@ -431,20 +450,12 @@ async function openChatInWebview(session: ChatSession, context: vscode.Extension
 
 async function exportChatToMarkdown(session: ChatSession): Promise<void> {
     try {
-        const sessionFilePath = await resolveAccessibleSessionFilePath(session);
-        if (!sessionFilePath) {
+        const sessionInfo = await loadSessionData(session);
+        if (!sessionInfo) {
             return;
         }
 
-        const sessionRaw = await fs.promises.readFile(sessionFilePath, 'utf8');
-        let sessionData: ChatSessionData;
-        try {
-            sessionData = JSON.parse(sessionRaw);
-        } catch {
-            vscode.window.showErrorMessage(`Chat session file is invalid or corrupted: ${sessionFilePath}`);
-            return;
-        }
-        const markdown = buildChatMarkdown(sessionData, session);
+        const markdown = buildChatMarkdown(sessionInfo.data, session);
 
         const defaultFileName = sanitizeFileName(session.customTitle || `chat-session-${session.id}`) + '.md';
         const defaultUri = vscode.Uri.file(path.join(os.homedir(), defaultFileName));
