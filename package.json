@@ -90,10 +90,15 @@
         "title": "Open Workspace in New Window",
         "icon": "$(link-external)"
       },
-      {
+      { 
         "command": "copilotChatHistory.openChatJson",
         "title": "Open JSON File",
         "icon": "$(file-code)"
+      },
+      {
+        "command": "copilotChatHistory.exportChatMarkdown",
+        "title": "Export Chat as Markdown",
+        "icon": "$(export)"
       }
     ],
     "menus": {
@@ -124,6 +129,11 @@
           "command": "copilotChatHistory.openChatJson",
           "when": "view == copilotChatHistoryView && viewItem == chatSession",
           "group": "chat@2"
+        },
+        {
+          "command": "copilotChatHistory.exportChatMarkdown",
+          "when": "view == copilotChatHistoryView && viewItem == chatSession",
+          "group": "chat@3"
         },
         {
           "command": "copilotChatHistory.openWorkspaceInCurrentWindow",

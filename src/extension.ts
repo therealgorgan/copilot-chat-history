@@ -2,22 +2,28 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
-
-// Interface для данных чата
-interface ChatSession {
-    id: string;
-    customTitle?: string;
-    workspaceName: string;
-    workspacePath?: string;
-    lastModified: Date;
-    filePath: string;
-    messageCount: number;
-}
+import type { ChatSession, ChatSessionData } from './types';
+import { buildChatMarkdown, sanitizeFileName } from './markdown/chatMarkdown';
+import { showCentralizedError } from './utils/notifications';
+import { loadSessionData, resolveAccessibleSessionFilePath, SessionFileError } from './utils/sessionFiles';
 
 interface WorkspaceGroup {
     workspaceName: string;
     workspacePath?: string;
     sessions: ChatSession[];
+}
+
+function logSessionFileError(scope: string, error: SessionFileError): void {
+    if (error.cause) {
+        console.error(`${scope}: ${error.message}`, error.cause);
+    } else {
+        console.error(`${scope}: ${error.message}`);
+    }
+}
+
+function handleSessionFileError(scope: string, error: SessionFileError): void {
+    logSessionFileError(scope, error);
+    showCentralizedError(error.message, error.context);
 }
 
 // Tree Data Provider для отображения истории чатов
@@ -269,7 +275,8 @@ class CopilotChatHistoryProvider implements vscode.TreeDataProvider<ChatSession 
                                 workspacePath,
                                 lastModified: stats.mtime,
                                 filePath: sessionPath,
-                                messageCount
+                                messageCount,
+                                storageRoot: chatSessionsPath
                             });
                         } catch (error) {
                             console.error(`Error reading session file ${sessionPath}:`, error);
@@ -368,38 +375,11 @@ class CopilotChatHistoryProvider implements vscode.TreeDataProvider<ChatSession 
     }
 }
 
-// Интерфейсы для структуры чата
-interface ChatMessage {
-    message: {
-        text: string;
-    };
-    response: Array<{
-        value: string;
-    }>;
-    timestamp?: number;
-}
-
-interface ChatSessionData {
-    version: number;
-    requesterUsername: string;
-    responderUsername: string;
-    requests: ChatMessage[];
-    customTitle?: string;
-    creationDate?: number;
-    lastMessageDate?: number;
-}
-
 // Функция для открытия чата в webview
-function openChatInWebview(session: ChatSession, context: vscode.ExtensionContext) {
+async function openChatInWebview(session: ChatSession, context: vscode.ExtensionContext) {
     try {
-        // Читаем данные сессии
-        if (!fs.existsSync(session.filePath)) {
-            vscode.window.showErrorMessage(`Chat session file not found: ${session.filePath}`);
-            return;
-        }
+        const sessionInfo = await loadSessionData(session);
 
-        const sessionData: ChatSessionData = JSON.parse(fs.readFileSync(session.filePath, 'utf8'));
-        
         // Создаем webview panel
         const panel = vscode.window.createWebviewPanel(
             'copilotChatViewer',
@@ -413,11 +393,79 @@ function openChatInWebview(session: ChatSession, context: vscode.ExtensionContex
         );
 
         // Генерируем HTML контент
-        panel.webview.html = generateChatHTML(sessionData, session);
+        panel.webview.html = generateChatHTML(sessionInfo.data, session);
 
     } catch (error) {
+        if (error instanceof SessionFileError) {
+            handleSessionFileError('openChatInWebview', error);
+            return;
+        }
+
         console.error('Error opening chat in webview:', error);
-        vscode.window.showErrorMessage(`Error opening chat: ${error}`);
+        showCentralizedError('Error opening chat: see logs for details.', 'openChatInWebview:unexpected');
+    }
+}
+
+async function exportChatToMarkdown(session: ChatSession): Promise<void> {
+    try {
+        const sessionInfo = await loadSessionData(session);
+
+        const markdown = buildChatMarkdown(sessionInfo.data, session);
+
+        const defaultFileName = sanitizeFileName(session.customTitle || `chat-session-${session.id}`) + '.md';
+        const defaultUri = vscode.Uri.file(path.join(os.homedir(), defaultFileName));
+
+        const saveUri = await vscode.window.showSaveDialog({
+            defaultUri,
+            filters: {
+                Markdown: ['md'],
+                'All Files': ['*']
+            }
+        });
+
+        if (!saveUri) {
+            return;
+        }
+
+        if (saveUri.scheme !== 'file') {
+            showCentralizedError(
+                'Only file system targets are supported for exporting chat sessions.',
+                'exportChatMarkdown:unsupportedScheme'
+            );
+            return;
+        }
+
+        const savePath = path.resolve(saveUri.fsPath);
+        let shouldWrite = true;
+        try {
+            await fs.promises.access(savePath, fs.constants.F_OK);
+            const overwrite = await vscode.window.showWarningMessage(
+                `File "${path.basename(savePath)}" already exists. Overwrite?`,
+                { modal: true },
+                'Overwrite'
+            );
+            if (overwrite !== 'Overwrite') {
+                shouldWrite = false;
+            }
+        } catch {
+            // File does not exist; safe to write.
+        }
+
+        if (!shouldWrite) {
+            vscode.window.showInformationMessage('Export cancelled: file not overwritten.');
+            return;
+        }
+
+        await fs.promises.writeFile(savePath, markdown, 'utf8');
+        vscode.window.showInformationMessage(`Chat exported to ${savePath}`);
+    } catch (error) {
+        if (error instanceof SessionFileError) {
+            handleSessionFileError('exportChatToMarkdown', error);
+            return;
+        }
+
+        console.error('Error exporting chat to markdown:', error);
+        showCentralizedError('Error exporting chat: see logs for details.', 'exportChatMarkdown:unexpected');
     }
 }
 
@@ -834,20 +882,29 @@ export function activate(context: vscode.ExtensionContext) {
         chatHistoryProvider.refresh();
     });
 
-    const openChatCommand = vscode.commands.registerCommand('copilotChatHistory.openChat', (session: ChatSession) => {
+    const openChatCommand = vscode.commands.registerCommand('copilotChatHistory.openChat', async (session: ChatSession) => {
         // Открываем чат в специальном webview вместо JSON файла
-        openChatInWebview(session, context);
+        await openChatInWebview(session, context);
     });
 
-    const openChatJsonCommand = vscode.commands.registerCommand('copilotChatHistory.openChatJson', (session: ChatSession) => {
-        // Открываем JSON файл сессии чата
-        if (fs.existsSync(session.filePath)) {
-            vscode.workspace.openTextDocument(session.filePath).then(doc => {
-                vscode.window.showTextDocument(doc);
-            });
-        } else {
-            vscode.window.showErrorMessage(`Chat session file not found: ${session.filePath}`);
+    const openChatJsonCommand = vscode.commands.registerCommand('copilotChatHistory.openChatJson', async (session: ChatSession) => {
+        try {
+            const sessionFilePath = await resolveAccessibleSessionFilePath(session);
+            const document = await vscode.workspace.openTextDocument(sessionFilePath);
+            await vscode.window.showTextDocument(document);
+        } catch (error) {
+            if (error instanceof SessionFileError) {
+                handleSessionFileError('openChatJson', error);
+                return;
+            }
+
+            console.error('Error opening chat JSON document:', error);
+            showCentralizedError('Error opening chat JSON: see logs for details.', 'openChatJson:unexpected');
         }
+    });
+
+    const exportChatMarkdownCommand = vscode.commands.registerCommand('copilotChatHistory.exportChatMarkdown', async (session: ChatSession) => {
+        await exportChatToMarkdown(session);
     });
 
     const helloWorldCommand = vscode.commands.registerCommand('copilotChatHistory.helloWorld', () => {
@@ -886,7 +943,10 @@ export function activate(context: vscode.ExtensionContext) {
                 const workspaceUri = vscode.Uri.file(normalizedPath);
                 await vscode.commands.executeCommand('vscode.openFolder', workspaceUri, false);
             } else {
-                vscode.window.showErrorMessage(`Workspace path does not exist: ${normalizedPath}`);
+                showCentralizedError(
+                    `Workspace path does not exist: ${normalizedPath}`,
+                    'openWorkspaceCurrent:missingPath'
+                );
             }
         } else {
             // Попробуем найти workspace вручную
@@ -896,7 +956,10 @@ export function activate(context: vscode.ExtensionContext) {
                 await vscode.commands.executeCommand('vscode.openFolder', workspaceUri, false);
                 vscode.window.showInformationMessage(`Found and opened workspace: ${foundPath}`);
             } else {
-                vscode.window.showErrorMessage(`Workspace path not found for: ${workspaceGroup.workspaceName}. Please open it manually.`);
+                showCentralizedError(
+                    `Workspace path not found for: ${workspaceGroup.workspaceName}. Please open it manually.`,
+                    'openWorkspaceCurrent:notFound'
+                );
             }
         }
     });
@@ -914,7 +977,10 @@ export function activate(context: vscode.ExtensionContext) {
                 const workspaceUri = vscode.Uri.file(normalizedPath);
                 await vscode.commands.executeCommand('vscode.openFolder', workspaceUri, true);
             } else {
-                vscode.window.showErrorMessage(`Workspace path does not exist: ${normalizedPath}`);
+                showCentralizedError(
+                    `Workspace path does not exist: ${normalizedPath}`,
+                    'openWorkspaceNewWindow:missingPath'
+                );
             }
         } else {
             // Попробуем найти workspace вручную
@@ -924,12 +990,15 @@ export function activate(context: vscode.ExtensionContext) {
                 await vscode.commands.executeCommand('vscode.openFolder', workspaceUri, true);
                 vscode.window.showInformationMessage(`Found and opened workspace: ${foundPath}`);
             } else {
-                vscode.window.showErrorMessage(`Workspace path not found for: ${workspaceGroup.workspaceName}. Please open it manually.`);
+                showCentralizedError(
+                    `Workspace path not found for: ${workspaceGroup.workspaceName}. Please open it manually.`,
+                    'openWorkspaceNewWindow:notFound'
+                );
             }
         }
     });
 
-    context.subscriptions.push(refreshCommand, openChatCommand, openChatJsonCommand, helloWorldCommand, searchCommand, clearFilterCommand, openWorkspaceInCurrentWindowCommand, openWorkspaceInNewWindowCommand);
+    context.subscriptions.push(refreshCommand, openChatCommand, openChatJsonCommand, helloWorldCommand, searchCommand, clearFilterCommand, openWorkspaceInCurrentWindowCommand, openWorkspaceInNewWindowCommand, exportChatMarkdownCommand);
 
     // Автоматически обновляем при активации
     chatHistoryProvider.refresh();
