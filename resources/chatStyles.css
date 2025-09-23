@@ -1,0 +1,275 @@
+/* Chat webview styling extracted from generateChatHTML */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+    margin: 0;
+    padding: 16px;
+    background-color: var(--vscode-editor-background);
+    color: var(--vscode-editor-foreground);
+    line-height: 1.4;
+    font-size: 13px;
+}
+
+.chat-container {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.chat-header {
+    border-bottom: 1px solid var(--vscode-panel-border);
+    padding-bottom: 12px;
+    margin-bottom: 16px;
+}
+
+.chat-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0 0 4px 0;
+    color: var(--vscode-editor-foreground);
+}
+
+.chat-meta {
+    color: var(--vscode-descriptionForeground);
+    font-size: 11px;
+}
+
+.message {
+    display: flex;
+    margin-bottom: 16px;
+    padding: 8px 16px;
+    gap: 8px;
+    border-radius: 3px;
+    position: relative;
+}
+
+.user-message {
+    background-color: transparent;
+}
+
+.copilot-message {
+    background-color: var(--vscode-chat-requestBackground, transparent);
+}
+
+.avatar {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+    font-size: 12px;
+    outline: 1px solid var(--vscode-contrastBorder, transparent);
+    outline-offset: -1px;
+}
+
+.user-avatar {
+    background-color: var(--vscode-testing-iconPassed);
+    color: var(--vscode-button-foreground);
+}
+
+.copilot-avatar {
+    background-color: var(--vscode-button-secondaryBackground);
+    color: var(--vscode-button-secondaryForeground);
+}
+
+.message-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.message-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 4px;
+    gap: 6px;
+}
+
+.username {
+    font-weight: 600;
+    font-size: 11px;
+    color: var(--vscode-editor-foreground);
+}
+
+.message-content {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    font-size: 13px;
+    color: var(--vscode-editor-foreground);
+}
+
+.message-markdown {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.metadata-section {
+    margin: 12px 0;
+    padding-left: 12px;
+    border-left: 2px solid var(--vscode-panel-border);
+}
+
+.metadata-title {
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--vscode-descriptionForeground);
+}
+
+.metadata-subtitle {
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--vscode-editor-foreground);
+}
+
+.metadata-block {
+    margin-bottom: 12px;
+}
+
+.detail-block {
+    margin-bottom: 12px;
+}
+
+.metadata-section details {
+    margin-bottom: 8px;
+}
+
+.metadata-section summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--vscode-editor-foreground);
+    margin-bottom: 4px;
+}
+
+.detail-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: minmax(120px, auto) 1fr;
+    gap: 4px 12px;
+    margin-bottom: 6px;
+    font-size: 12px;
+}
+
+.detail-key {
+    color: var(--vscode-descriptionForeground);
+    font-weight: 500;
+}
+
+.detail-value {
+    color: var(--vscode-editor-foreground);
+    overflow-wrap: anywhere;
+}
+
+.message-paragraph {
+    margin: 6px 0;
+}
+
+.message-pre {
+    font-family: var(--vscode-editor-font-family, 'SFMono-Regular', Consolas, 'Courier New', monospace);
+    font-size: 12px;
+    background-color: var(--vscode-textCodeBlock-background);
+    padding: 8px;
+    border-radius: 4px;
+    overflow-x: auto;
+    border: 1px solid var(--vscode-panel-border);
+}
+
+.raw-json {
+    margin: 8px 0;
+}
+
+.messages code {
+    font-family: var(--vscode-editor-font-family, 'SFMono-Regular', Consolas, 'Courier New', monospace);
+    background-color: var(--vscode-editor-inactiveSelectionBackground);
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-size: 12px;
+}
+
+.messages pre code {
+    background: transparent;
+    padding: 0;
+}
+
+.messages ul,
+.messages ol {
+    margin: 6px 0 6px 16px;
+}
+
+.messages blockquote {
+    border-left: 3px solid var(--vscode-panel-border);
+    margin: 6px 0;
+    padding-left: 10px;
+    color: var(--vscode-descriptionForeground);
+    font-style: italic;
+}
+
+.messages hr {
+    border: none;
+    border-top: 1px solid var(--vscode-panel-border);
+    margin: 12px 0;
+}
+
+.messages table {
+    border-collapse: collapse;
+    margin: 8px 0;
+    width: 100%;
+}
+
+.messages th,
+.messages td {
+    border: 1px solid var(--vscode-panel-border);
+    padding: 6px 8px;
+    text-align: left;
+}
+
+.messages th {
+    background-color: var(--vscode-keybindingTable-headerBackground);
+    font-weight: 600;
+}
+
+.messages a {
+    color: var(--vscode-textLink-foreground);
+    text-decoration: none;
+}
+
+.messages a:hover {
+    color: var(--vscode-textLink-activeForeground);
+    text-decoration: underline;
+}
+
+.empty-chat {
+    text-align: center;
+    color: var(--vscode-descriptionForeground);
+    padding: 40px 20px;
+    font-style: italic;
+    font-size: 13px;
+}
+
+@media (max-width: 600px) {
+    body {
+        padding: 8px;
+    }
+
+    .message {
+        padding: 6px 12px;
+        gap: 6px;
+    }
+
+    .avatar {
+        width: 18px;
+        height: 18px;
+        font-size: 10px;
+    }
+
+    .message-content {
+        font-size: 12px;
+    }
+}
