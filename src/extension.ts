@@ -121,6 +121,21 @@ async function restoreArchivedEntries(entries: ArchiveEntry[]): Promise<void> {
     }
 }
 
+// Remove empty workspace directories from archive
+async function removeEmptyArchiveWorkspace(workspacePath: string): Promise<void> {
+    try {
+        if (!fs.existsSync(workspacePath)) return;
+        const files = fs.readdirSync(workspacePath);
+        const hasConversations = files.some(f => f.endsWith('.json') && !f.endsWith('.meta.json'));
+        if (!hasConversations) {
+            // Directory is empty of conversations, remove it
+            await fs.promises.rmdir(workspacePath, { recursive: true });
+        }
+    } catch (err) {
+        console.error('Error removing empty archive workspace:', err);
+    }
+}
+
 // Tree Data Provider для отображения истории чатов
 class CopilotChatHistoryProvider implements vscode.TreeDataProvider<ChatSession | WorkspaceGroup> {
     private _onDidChangeTreeData: vscode.EventEmitter<ChatSession | WorkspaceGroup | undefined | null | void> = new vscode.EventEmitter<ChatSession | WorkspaceGroup | undefined | null | void>();
@@ -313,8 +328,7 @@ class CopilotChatHistoryProvider implements vscode.TreeDataProvider<ChatSession 
             
             // Это группа workspace
             const isCurrentWorkspace = this.isCurrentWorkspace(element);
-            const itemLabel = isCurrentWorkspace ? `$(star-full) ${element.workspaceName}` : element.workspaceName;
-            const item = new vscode.TreeItem(itemLabel, vscode.TreeItemCollapsibleState.Collapsed);
+            const item = new vscode.TreeItem(element.workspaceName, vscode.TreeItemCollapsibleState.Collapsed);
             const sessionsDescription = `${element.sessions.length} sessions`;
             item.iconPath = new vscode.ThemeIcon(isCurrentWorkspace ? 'root-folder-opened' : 'folder');
             item.description = isCurrentWorkspace ? `Current • ${sessionsDescription}` : sessionsDescription;
@@ -683,7 +697,7 @@ class CopilotChatHistoryProvider implements vscode.TreeDataProvider<ChatSession 
         return sessions;
     }
 
-    private uriToPath(uri: string): string {
+    public uriToPath(uri: string): string {
         try {
             // Если это URI, конвертируем в путь
             if (uri.startsWith('file://')) {
@@ -891,8 +905,17 @@ export function activate(context: vscode.ExtensionContext) {
     }
 
     // Регистрируем команды
-    const refreshCommand = safeRegister('copilotChatHistory.refresh', () => {
+    const refreshCommand = safeRegister('copilotChatHistory.refresh', async () => {
+        // Force reload from disk by clearing cache and re-scanning
+        chatHistoryProvider.cachedSessions = [];
+        await chatHistoryProvider.listAllChatSessions(true);
         chatHistoryProvider.refresh();
+        vscode.window.showInformationMessage('Chat sessions refreshed.');
+    });
+    
+    const archiveRefreshCommand = safeRegister('copilotChatHistory.archiveRefresh', () => {
+        archiveProvider.refresh();
+        vscode.window.showInformationMessage('Archive refreshed.');
     });
 
     const openChatCommand = safeRegister('copilotChatHistory.openChat', async (session: ChatSession) => {
@@ -1564,11 +1587,13 @@ export function activate(context: vscode.ExtensionContext) {
         try {
             const metaPath = archived.filePath + '.meta.json';
             let originalPath: string | undefined;
+            let sessionId: string | undefined;
             try {
                 if (fs.existsSync(metaPath)) {
                     const metaRaw = await fs.promises.readFile(metaPath, 'utf8');
                     const meta = JSON.parse(metaRaw);
                     originalPath = meta.originalPath;
+                    sessionId = meta.sessionId;
                 }
             } catch (err) {
                 // ignore
@@ -1586,8 +1611,71 @@ export function activate(context: vscode.ExtensionContext) {
 
             await moveFileTo(originalPath, archived.filePath);
             try { if (fs.existsSync(metaPath)) await fs.promises.unlink(metaPath); } catch {}
-            archiveProvider.refresh();
+            
+            // Force reload the restored session into cache
+            try {
+                const stats = fs.statSync(originalPath);
+                const raw = fs.readFileSync(originalPath, 'utf8');
+                const sessionData = JSON.parse(raw);
+                const messageCount = sessionData.requests ? sessionData.requests.length : 0;
+                let customTitle = sessionData.customTitle;
+                if (!customTitle && sessionData.requests && sessionData.requests.length > 0) {
+                    const firstRequest = sessionData.requests[0];
+                    if (firstRequest && firstRequest.message && firstRequest.message.text) {
+                        customTitle = firstRequest.message.text.replace(/\n/g, ' ').trim().substring(0, 50);
+                        if (firstRequest.message.text.length > 50) customTitle += '...';
+                    }
+                }
+                
+                // Determine workspace info from path
+                const chatSessionsPath = path.dirname(originalPath);
+                const workspaceDir = path.dirname(chatSessionsPath);
+                let workspaceName = 'Unknown';
+                let workspacePath: string | undefined;
+                const workspaceJsonPath = path.join(workspaceDir, 'workspace.json');
+                if (fs.existsSync(workspaceJsonPath)) {
+                    try {
+                        const workspaceData = JSON.parse(fs.readFileSync(workspaceJsonPath, 'utf8'));
+                        if (workspaceData.folder) {
+                            workspacePath = chatHistoryProvider.uriToPath(workspaceData.folder);
+                            if (workspacePath) workspaceName = path.basename(workspacePath);
+                        }
+                    } catch (err) {}
+                }
+                
+                const restoredSession: ChatSession = {
+                    id: path.basename(originalPath, '.json'),
+                    customTitle,
+                    workspaceName,
+                    workspacePath,
+                    lastModified: stats.mtime,
+                    filePath: originalPath,
+                    messageCount,
+                    storageRoot: chatSessionsPath
+                };
+                
+                // Add to cache
+                chatHistoryProvider.cachedSessions.push(restoredSession);
+            } catch (err) {
+                console.error('Error loading restored session into cache:', err);
+            }
+            
+            // Add to skip-auto-archive list if we know the session ID
+            if (sessionId) {
+                await addToSkipAutoArchive(sessionId);
+                // Auto-remove from skip list after 5 minutes (300000ms) - gives user time to see it before auto-archive runs
+                setTimeout(async () => {
+                    await removeFromSkipAutoArchive(sessionId);
+                }, 300000);
+            }
+            
+            // Remove workspace directory if it's now empty
+            const archiveWorkspacePath = path.dirname(archived.filePath);
+            await removeEmptyArchiveWorkspace(archiveWorkspacePath);
+            
+            // Refresh both views immediately
             chatHistoryProvider.refresh();
+            archiveProvider.refresh();
             vscode.window.showInformationMessage('Archived conversation restored.');
         } catch (err) {
             console.error('Error restoring archived session', err);
@@ -1607,9 +1695,14 @@ export function activate(context: vscode.ExtensionContext) {
             if (confirm !== 'Delete') return;
 
             try {
+                const workspacePath = path.dirname(archived.filePath);
                 await fs.promises.unlink(archived.filePath);
                 const metaPath = archived.filePath + '.meta.json';
                 try { if (fs.existsSync(metaPath)) await fs.promises.unlink(metaPath); } catch {}
+                
+                // Remove workspace directory if it's now empty
+                await removeEmptyArchiveWorkspace(workspacePath);
+                
                 archiveProvider.refresh();
                 vscode.window.showInformationMessage('Archived file deleted permanently.');
             } catch (err) {
@@ -1703,6 +1796,11 @@ export function activate(context: vscode.ExtensionContext) {
                 }
             });
 
+            // Clean up empty workspace directories
+            for (const dir of targetDirs) {
+                await removeEmptyArchiveWorkspace(dir);
+            }
+
             archiveProvider.refresh();
 
             if (cancelled) {
@@ -1750,6 +1848,47 @@ export function activate(context: vscode.ExtensionContext) {
             }
         } catch (err) {
             console.error('Error in scheduled purge:', err);
+        }
+    }
+
+    // Skip-auto-archive tracking: store session IDs to skip during auto-archive
+    const skipAutoArchiveKey = 'skipAutoArchiveSessionIds';
+    
+    async function addToSkipAutoArchive(sessionId: string): Promise<void> {
+        const skipList = context.globalState.get<string[]>(skipAutoArchiveKey) || [];
+        if (!skipList.includes(sessionId)) {
+            skipList.push(sessionId);
+            await context.globalState.update(skipAutoArchiveKey, skipList);
+        }
+    }
+    
+    async function removeFromSkipAutoArchive(sessionId: string): Promise<void> {
+        let skipList = context.globalState.get<string[]>(skipAutoArchiveKey) || [];
+        skipList = skipList.filter(id => id !== sessionId);
+        await context.globalState.update(skipAutoArchiveKey, skipList);
+    }
+    
+    async function isSkipAutoArchive(sessionId: string): Promise<boolean> {
+        const skipList = context.globalState.get<string[]>(skipAutoArchiveKey) || [];
+        return skipList.includes(sessionId);
+    }
+    
+    // Clean stale entries from skip list (sessions that no longer exist)
+    async function cleanupSkipAutoArchiveList(): Promise<void> {
+        try {
+            const skipList = context.globalState.get<string[]>(skipAutoArchiveKey) || [];
+            if (skipList.length === 0) return;
+            
+            const allSessions = await chatHistoryProvider.listAllChatSessions(true);
+            const existingIds = new Set(allSessions.map(s => s.id));
+            
+            const cleanedList = skipList.filter(id => existingIds.has(id));
+            if (cleanedList.length !== skipList.length) {
+                await context.globalState.update(skipAutoArchiveKey, cleanedList);
+                console.info('Cleaned up skip-auto-archive list:', skipList.length - cleanedList.length, 'stale entries removed');
+            }
+        } catch (err) {
+            console.error('Error cleaning skip-auto-archive list:', err);
         }
     }
 
@@ -1807,6 +1946,12 @@ export function activate(context: vscode.ExtensionContext) {
                     for (let i = 0; i < arr.length; i++) {
                         if (token.isCancellationRequested) break;
                         const s = arr[i];
+                        
+                        // Skip if user explicitly unarchived this session
+                        if (await isSkipAutoArchive(s.id)) {
+                            console.info('Auto-archive: skipping', s.id, '(user unarchived recently)');
+                            continue;
+                        }
                         try {
                             if (action === 'delete') {
                                 const p = await resolveSessionFilePath(s);
@@ -1864,6 +2009,11 @@ export function activate(context: vscode.ExtensionContext) {
                 statusBar.hide();
             }
         });
+        
+        // Periodically clean up stale entries from skip-auto-archive list (every hour)
+        setInterval(() => {
+            cleanupSkipAutoArchiveList();
+        }, 60 * 60 * 1000);
     });
 
     // Leader election helpers (use lock file in global storage)
@@ -2318,7 +2468,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
-    context.subscriptions.push(runAutoArchiveCommand, archiveConversationCommand, archiveAllConversationsCommand, unarchiveAllSessionsCommand, openAutoArchiveSettingsCommand, loadMoreConversationsCommand, importChatSessionCommand);
+    context.subscriptions.push(runAutoArchiveCommand, archiveConversationCommand, archiveAllConversationsCommand, unarchiveAllSessionsCommand, openAutoArchiveSettingsCommand, loadMoreConversationsCommand, importChatSessionCommand, archiveRefreshCommand);
 
 
     context.subscriptions.push(

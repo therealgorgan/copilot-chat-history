@@ -140,7 +140,8 @@ export class ArchiveProvider implements vscode.TreeDataProvider<ArchiveGroup | A
         // Add action buttons for archived session - ordered: Unarchive, Import, Delete
         (item as any).buttons = [
             {
-                iconPath: new vscode.ThemeIcon('undo'),
+                // Use explicit SVG icon to avoid ThemeIcon rendering issues
+                iconPath: vscode.Uri.file(path.join(this.context.extensionPath, 'resources', 'icons', 'restore.svg')),
                 tooltip: 'Restore Archived Conversation',
                 command: {
                     command: 'copilotChatHistory.restoreArchivedSession',
@@ -201,7 +202,7 @@ export class ArchiveProvider implements vscode.TreeDataProvider<ArchiveGroup | A
             try {
                 if (!fs.existsSync(element.folderPath)) return [];
                 const files = fs.readdirSync(element.folderPath, { withFileTypes: true })
-                    .filter(f => f.isFile() && f.name.endsWith('.json'))
+                    .filter(f => f.isFile() && f.name.endsWith('.json') && !f.name.endsWith('.meta.json'))
                     .map(f => {
                         const filePath = path.join(element.folderPath, f.name);
                         let title: string | undefined;
@@ -229,7 +230,7 @@ export class ArchiveProvider implements vscode.TreeDataProvider<ArchiveGroup | A
     private countArchivedFiles(folderPath: string): number {
         try {
             if (!fs.existsSync(folderPath)) return 0;
-            return fs.readdirSync(folderPath).filter(f => f.endsWith('.json')).length;
+            return fs.readdirSync(folderPath).filter(f => f.endsWith('.json') && !f.endsWith('.meta.json')).length;
         } catch (err) {
             return 0;
         }
