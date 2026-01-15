@@ -1,8 +1,8 @@
 {
   "name": "copilot-chat-history-fork",
   "displayName": "Copilot Chat History (Fork)",
-  "description": "View and manage your GitHub Copilot chat history organized by workspace with search and navigation features",
-  "version": "1.5.1",
+  "description": "Advanced Copilot chat history management with archive, undo, bulk operations, background scanning, leader election, auto-archive/purge, and more. Fork of Arbuzov/copilot-chat-history with 10+ major enhancements.",
+  "version": "1.6.0",
   "publisher": "therealgorgan",
   "license": "MIT",
   "author": {

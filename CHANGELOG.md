@@ -5,7 +5,41 @@ All notable changes to the "copilot-chat-history" extension will be documented i
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-01-15
+
+### ✨ UI/UX Improvements & Bug Fixes
+
+- **Functional Refresh Buttons** — Chat Sessions and Archive views now have working refresh buttons that:
+  - Clear cache and force disk reload for Chat Sessions
+  - Refresh archive listing for Archive view
+  - Show confirmation messages
+- **Empty Workspace Auto-Removal** — When the last conversation is deleted, restored, or archived from a workspace, that workspace directory is automatically removed from both views, keeping the interface clean
+- **Improved Button Labels** — Delete (Archive) button now has clearer label to indicate it moves to archive rather than permanent deletion
+- **Immediate Unarchive Visibility** — Restored sessions now appear instantly in Chat Sessions view by directly adding to cache instead of waiting for background scan
+- **Package Rename** — Extension renamed to `copilot-chat-history-fork` for Marketplace uniqueness
+
+### 🔧 Archive Operations
+
+- Delete archived conversations now removes empty workspace directories
+- Restore archived conversations removes empty archive workspace dirs
+- Empty Archive command cleans up empty workspace directories after bulk deletion
+- Workspace directories only shown when they contain archived conversations
+
+### 🐛 Bug Fixes
+
+- Fixed refresh buttons not triggering actual data reload
+- Fixed unarchived sessions not appearing immediately in Chat Sessions
+- Fixed duplicate archive listings showing both .json and .meta.json files
+- Fixed archive count displaying double the actual number
+- Fixed "Archive Conversation" label on trash button (now "Delete (Archive)")
+
+---
+
 ## [1.5.0] - 2026-01-15
+
+### 🎯 Major New Features (Fork Additions Beyond Original)
+
+This version represents a significant expansion beyond the original v1.1.0 base, adding enterprise-grade archive and background processing capabilities.
 
 ### 👑 Leader Election & Distributed Consensus
 
@@ -25,6 +59,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Archive Browser Enhancement** — improved UI and filtering for browsing archived sessions.
 - **Per-Workspace Archive Folders** — archived items are organized by workspace for easier management and restoration.
 - **Permanent Delete** — option to permanently delete archived conversations or entire workspace archives.
+- **Auto-Archive Feature** — automatically archive oldest conversations when workspace exceeds configured session limit.
+- **Auto-Purge Feature** — scheduled purging of archived conversations based on retention policy.
+
+### ♻️ Soft-Delete & Undo
+
+- **Move to Archive** — delete operations move session files to archive instead of permanent removal. Archived files are not scanned by Copilot, improving performance.
+- **Undo Support** — after delete operations, extension shows Undo action to restore moved sessions instantly.
+- **Safety by Default** — helps reclaim UI performance while keeping option to restore if deleted by mistake.
+
+### 📊 Bulk Operations
+
+- **Multi-Select** — select multiple conversations (Ctrl/Cmd+click) for bulk operations.
+- **Export Selected** — export multiple conversations at once with cancellation support.
+- **Delete Selected** — delete multiple conversations with confirmation and progress reporting.
+- **Workspace Delete All** — delete all conversations for a workspace in one action.
+- **Progress Reporting** — more informative progress notifications during long operations.
 
 ### ⚙️ Configuration & Settings
 
@@ -42,6 +92,115 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Better error handling for archive operations
 - More informative progress notifications and success summaries
 - Graceful fallback if leader election fails
+- Cancellation support for long-running operations
+
+---
+
+## [1.3.0] - 2026-01-14 (Fork Addition)
+
+### 🗑️ Archive Management & Browser
+
+- **Archive Browser** — new view to browse archived sessions grouped by workspace; restore or permanently delete items individually.
+- **Empty Archive** — new command to permanently delete archived conversations with scope options (global or per-workspace), retention policy (delete older than N days), progress reporting, and cancellation support.
+
+### ♻️ Soft-delete & Undo
+
+- **Move to Archive** — delete operations now move session files to an **archive** in the extension's global storage instead of permanently removing them immediately. Archived files are not scanned by Copilot and won't show up in history.
+- **Undo** — after deleting (single, selected, or workspace delete-all) the extension shows an **Undo** action to restore the moved sessions instantly.
+- **Safety & Performance** — soft-delete helps quickly reclaim UI list performance while keeping an option to restore if deleted by mistake.
+
+### ✨ Fork Identification
+
+- **Renamed** extension display name to **Copilot Chat History (Fork w/Improvements)** to differentiate from upstream.
+
+---
+
+## [1.1.0] - 2025-09-06 (Original Base)
+
+### ✨ Enhanced Chat Renderer (Original)
+
+- **Authentic VS Code Styling**: Updated webview chat renderer with authentic CSS styles based on the official VS Code Copilot Chat repository
+- **Professional Icons**: Replaced emoji avatars with professional SVG icons matching VS Code's design language
+- **Improved Message Layout**: Restructured message layout to match official VS Code chat interface
+- **Better Typography**: Enhanced font rendering and sizing for improved readability
+- **Advanced Markdown Support**: 
+  - Support for four-backtick code blocks (like official Copilot)
+  - Improved inline code formatting
+  - Better list and quote handling
+  - Link detection and formatting
+  - Proper table rendering
+- **Responsive Design**: Added mobile-friendly responsive breakpoints
+- **Theme Integration**: Full integration with VS Code color themes
+
+### 🎨 Visual Improvements
+
+- **Native Look & Feel**: Chat display now closely matches the official VS Code Copilot Chat interface
+- **Proper Spacing**: Adjusted margins, padding, and line heights to match VS Code standards
+- **Color Consistency**: All colors now use VS Code's CSS variables for perfect theme integration
+- **Avatar Redesign**: Professional user and Copilot icons instead of emoji
+- **Message Bubbles**: Cleaner message container styling with proper borders and backgrounds
+
+### 🐛 Bug Fixes
+
+- Fixed markdown formatting edge cases
+- Improved code block language detection
+- Better handling of special characters in content
+- Fixed responsive design issues on smaller screens
+
+---
+
+## [1.0.1] - 2025-09-06
+
+### Fixed
+- Updated Node.js version requirement to 20.x for compatibility with latest vsce and dependencies
+- Fixed CI/CD pipeline to use @vscode/vsce instead of deprecated vsce package
+- Updated GitHub Actions to use modern actions (softprops/action-gh-release@v1)
+
+---
+
+## [1.0.0] - 2025-09-06 (Original Release)
+
+### Added
+- Initial release of Copilot Chat History extension
+- Workspace-based organization of Copilot chat sessions
+- Tree view in Activity Bar for easy navigation
+- Search and filter functionality for chat sessions
+- Inline buttons for opening workspaces (current/new window)
+- Smart title generation from chat content
+- Automatic workspace path resolution
+- Support for collapsed/expanded workspace groups
+- Refresh functionality to reload chat data
+
+### Features
+- **Chat Organization**: Groups chat sessions by workspace for better organization
+- **Search**: Filter chat sessions by title with case-insensitive search
+- **Workspace Navigation**: Direct workspace opening from chat history
+- **Smart Titles**: Automatically generates meaningful titles from first message if no custom title exists
+- **Performance**: Efficient scanning of VS Code workspace storage
+- **User Experience**: Clean, intuitive tree interface
+
+### Technical Details
+- Compatible with VS Code 1.103.0+
+- TypeScript implementation with full type safety
+- Efficient file system scanning and caching
+- URI path resolution for cross-platform compatibility
+- Error handling for missing or moved workspaces
+
+---
+
+## Comparison: What's New in This Fork
+
+### vs. Original v1.1.0
+- ✅ **Archive Management** — Complete soft-delete and archive browsing (Original: No)
+- ✅ **Undo Support** — Instant undo for delete operations (Original: No)
+- ✅ **Bulk Operations** — Multi-select export/delete (Original: No)
+- ✅ **Background Scanning** — Continuous monitoring without UI blocking (Original: No)
+- ✅ **Leader Election** — Distributed consensus for multi-window safety (Original: No)
+- ✅ **Auto-Archive** — Automatic archiving based on session limits (Original: No)
+- ✅ **Auto-Purge** — Scheduled retention policy enforcement (Original: No)
+- ✅ **Pagination** — Load More support for large workspaces (Original: No)
+- ✅ **Functional Refresh** — Actual data reload on refresh (Original: Basic refresh only)
+- ✅ **Better Cancellation** — Cancel long-running operations (Original: No)
 
 ## [1.3.0] - 2026-01-14
 

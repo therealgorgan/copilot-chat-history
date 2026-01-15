@@ -1,12 +1,38 @@
 # Copilot Chat History (Fork w/Improvements)
 
-> This is a fork of the original Copilot Chat History extension with additional export and maintenance features (multi-select export/delete, cancellable progress, per-item delete, workspace delete-all).
+> **This is a fork of the original [Copilot Chat History](https://github.com/Arbuzov/copilot-chat-history) extension with significant enhancements** including archive management, undo support, bulk operations, background scanning, distributed consensus (leader election), auto-archive/auto-purge, pagination, and much more.
 
 A Visual Studio Code extension that helps you view and manage your GitHub Copilot chat history organized by workspace.
 
+## 🚀 What's New in This Fork
+
+This fork adds **10+ major features** beyond the original v1.1.0 base:
+
+| Feature | This Fork | Original |
+|---------|-----------|----------|
+| **Archive Management** | ✅ Complete soft-delete and archive browsing | ❌ No |
+| **Undo Support** | ✅ Instant undo for any delete operation | ❌ No |
+| **Bulk Operations** | ✅ Multi-select export/delete with progress | ❌ No |
+| **Background Scanning** | ✅ Continuous monitoring without UI blocking | ❌ No |
+| **Leader Election** | ✅ Distributed consensus for multi-window safety | ❌ No |
+| **Auto-Archive** | ✅ Automatic archiving based on session limits | ❌ No |
+| **Auto-Purge** | ✅ Scheduled retention policy enforcement | ❌ No |
+| **Pagination (Load More)** | ✅ Load conversations in batches for large workspaces | ❌ No |
+| **Functional Refresh** | ✅ Actual data reload on refresh button | ⚠️ Basic only |
+| **Cancellable Operations** | ✅ Cancel long-running operations | ❌ No |
+| **Chat Rendering** | ✅ Enhanced with professional styling (v1.1.0) | ✅ Same v1.1.0 |
+| **Workspace Organization** | ✅ Same excellent organization | ✅ Same |
+
+### Recent Improvements (v1.6.0)
+- ✅ **Functional Refresh Buttons** — Chat Sessions and Archive views now properly reload data from disk
+- ✅ **Empty Workspace Auto-Removal** — Empty workspaces automatically removed from both views
+- ✅ **Immediate Unarchive Visibility** — Restored sessions appear instantly in Chat Sessions
+- ✅ **Better Button Labels** — Delete (Archive) button clearly indicates move to archive
+- ✅ **Fixed Archive Bugs** — Fixed duplicate listings, incorrect counts, and UI refresh issues
+
 ## 🎨 Enhanced Chat Display (v1.1.0)
 
-The extension now features a completely redesigned chat renderer that closely matches the official VS Code Copilot Chat interface:
+The extension features a completely redesigned chat renderer that closely matches the official VS Code Copilot Chat interface:
 
 ### ✨ New Features
 - **Authentic VS Code Styling**: CSS styles based on the official VS Code Copilot Chat repository
@@ -47,6 +73,7 @@ The extension now features a completely redesigned chat renderer that closely ma
 - 🔄 **Auto-Archive**: Automatically archive or delete oldest conversations when a workspace exceeds the configured session limit
 - ⏰ **Auto-Purge**: Scheduled purging of archived conversations based on retention policy
 - ⚙️ **Configurable Settings**: Fine-tune leader election, background scanning intervals, and auto-maintenance policies
+- 🔄 **Working Refresh Buttons**: Both Chat Sessions and Archive views have functional refresh buttons that reload data from disk
 
 ### Where archives are stored
 
@@ -58,7 +85,7 @@ Archived conversation files are placed in the extension's global storage under a
 
 1. Open VS Code
 2. Go to Extensions (Ctrl+Shift+X)
-3. Search for "Copilot Chat History"
+3. Search for "Copilot Chat History (Fork)"
 4. Click Install
 
 ### From GitHub Releases
@@ -92,7 +119,7 @@ Archived conversation files are placed in the extension's global storage under a
 
 ### Refreshing
 
-- Click the refresh button (🔄) to reload chat history
+- Click the refresh button (🔄) to reload chat history from disk
 - Automatically scans for new chat sessions
 
 ## How it Works
