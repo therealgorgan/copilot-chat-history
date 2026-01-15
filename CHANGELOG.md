@@ -5,6 +5,68 @@ All notable changes to the "copilot-chat-history" extension will be documented i
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-01-15
+
+### 👑 Leader Election & Distributed Consensus
+
+- **Leader Election** — implements distributed consensus mechanism to ensure only one VS Code instance performs auto-archive/cleanup operations across multiple windows.
+- **Master Lock Management** — uses timeout-based locks with configurable TTL and heartbeat intervals to prevent race conditions.
+- **Configurable Consensus** — new settings for `leaderCheckIntervalSeconds`, `lockTTLSeconds`, and `heartbeatIntervalSeconds` to tune the election algorithm.
+- **Safety & Consistency** — prevents duplicate auto-archive work and maintains consistency across instances.
+
+### 🔄 Background Scanning & Load More
+
+- **Background Scanning** — continuously monitors workspace storage for new chat sessions without blocking UI.
+- **Load More Conversations** — pagination support to load conversations in batches, improving performance for workspaces with many sessions.
+- **Smart Pagination** — configurable batch size for fetching and displaying sessions incrementally.
+
+### 🗄️ Archive Management Improvements
+
+- **Archive Browser Enhancement** — improved UI and filtering for browsing archived sessions.
+- **Per-Workspace Archive Folders** — archived items are organized by workspace for easier management and restoration.
+- **Permanent Delete** — option to permanently delete archived conversations or entire workspace archives.
+
+### ⚙️ Configuration & Settings
+
+- New advanced settings for auto-archive, auto-purge, and leader election:
+  - `copilotChatHistory.autoArchive.leaderElectionEnabled` — enable/disable leader election
+  - `copilotChatHistory.autoArchive.lockTTLSeconds` — master lock timeout
+  - `copilotChatHistory.autoArchive.heartbeatIntervalSeconds` — lock refresh frequency
+  - `copilotChatHistory.autoArchive.leaderCheckIntervalSeconds` — election check frequency
+  - `copilotChatHistory.autoPurge.checkIntervalHours` — purge job frequency
+  - `copilotChatHistory.autoArchive.checkIntervalHours` — auto-archive job frequency
+
+### 🎯 Performance & Reliability
+
+- Improved background task scheduling to prevent UI blocking
+- Better error handling for archive operations
+- More informative progress notifications and success summaries
+- Graceful fallback if leader election fails
+
+## [1.3.0] - 2026-01-14
+
+### 🗑️ Archive Management & Browser
+
+- **Archive Browser** — new view to browse archived sessions grouped by workspace; restore or permanently delete items individually.
+- **Empty Archive** — new command to permanently delete archived conversations with scope options (global or per-workspace), retention policy (delete older than N days), progress reporting, and cancellation support.
+
+### ♻️ Soft-delete & Undo
+
+- **Move to Archive** — delete operations now move session files to an **archive** in the extension's global storage instead of permanently removing them immediately. Archived files are not scanned by Copilot and won't show up in history.
+- **Undo** — after deleting (single, selected, or workspace delete-all) the extension shows an **Undo** action to restore the moved sessions instantly.
+- **Safety & Performance** — soft-delete helps quickly reclaim UI list performance while keeping an option to restore if deleted by mistake.
+
+### ✨ Fork & Improvements
+
+- **Renamed** extension display name to **Copilot Chat History (Fork w/Improvements)** to differentiate from upstream.
+- **Cancellation** support for exports and deletes: users can cancel long-running operations via the notification progress Cancel button.
+- **Multi-select**: select multiple conversations (Ctrl/Cmd+click) and export or delete them in bulk from the view title or context menu.
+- **Per-item Delete**: inline Delete action for each conversation node.
+- **Workspace Delete All**: delete all conversations for a workspace with a single action (confirmation and progress provided).
+- **Progress reporting**: more informative progress notifications and better success/error summaries.
+- **Docs**: README and CHANGELOG updated to reflect fork changes.
+
+
 ## [1.1.0] - 2025-09-06
 
 ### ✨ Enhanced Chat Renderer

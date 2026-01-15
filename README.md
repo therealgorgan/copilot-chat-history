@@ -1,4 +1,6 @@
-# Copilot Chat History
+# Copilot Chat History (Fork w/Improvements)
+
+> This is a fork of the original Copilot Chat History extension with additional export and maintenance features (multi-select export/delete, cancellable progress, per-item delete, workspace delete-all).
 
 A Visual Studio Code extension that helps you view and manage your GitHub Copilot chat history organized by workspace.
 
@@ -24,12 +26,31 @@ The extension now features a completely redesigned chat renderer that closely ma
 
 ## Features
 
+### 📊 Chat History Management
 - 📁 **Workspace Organization**: Chat sessions grouped by workspace for easy navigation
 - 🔍 **Search & Filter**: Quickly find specific chat sessions by title or content
 - 🔗 **Quick Access**: Open workspaces directly from chat history with inline buttons
 - 📝 **Smart Titles**: Automatically generates meaningful titles from chat content
 - 🌲 **Tree View**: Clean, collapsible interface in the Activity Bar
 - ⚡ **Fast Performance**: Efficient scanning and caching of chat data
+- 📈 **Load More**: Pagination support to load conversations in batches, improving UI performance for workspaces with many sessions
+
+### 🗑️ Archive & Deletion Management
+- ♻️ **Soft-delete (Move to Archive)**: Deleted conversations are moved to an archive folder in the extension's global storage so they are not scanned by Copilot and do not affect history or performance. You can Undo deletes immediately after the operation.
+- 🗄️ **Archive Browser**: A new Archive view lists archived conversations grouped by workspace; restore or permanently delete specific archived items.
+- ↩️ **Undo deletions**: Immediately after delete operations the extension offers an **Undo** action to restore moved sessions back to their original location.
+- 🔁 **Bulk Operations**: Multi-select export and delete with progress and ability to cancel via the notification.
+
+### ⚙️ Advanced Features
+- 🎯 **Background Scanning**: Continuously monitors workspace storage for new chat sessions in the background without blocking the UI
+- 👑 **Leader Election**: Uses distributed consensus to ensure only one VS Code instance performs auto-archive/cleanup operations across multiple windows, preventing race conditions and duplicate work
+- 🔄 **Auto-Archive**: Automatically archive or delete oldest conversations when a workspace exceeds the configured session limit
+- ⏰ **Auto-Purge**: Scheduled purging of archived conversations based on retention policy
+- ⚙️ **Configurable Settings**: Fine-tune leader election, background scanning intervals, and auto-maintenance policies
+
+### Where archives are stored
+
+Archived conversation files are placed in the extension's global storage under an `archive` directory (programmatically: `context.globalStorageUri/fsPath/archive`). On Windows this typically lives under `%APPDATA%\Code\User\globalStorage\<extension-id>\archive`. Inside the `archive` folder each workspace has its own subfolder (named using the workspace's folder name), which makes it easy to perform per-workspace archival operations. These files are kept out of workspace storage so Copilot does not load them into the history, improving performance when many sessions exist.
 
 ## Installation
 
@@ -42,7 +63,7 @@ The extension now features a completely redesigned chat renderer that closely ma
 
 ### From GitHub Releases
 
-1. Download the latest `.vsix` file from [Releases](https://github.com/your-username/copilot-chat-history/releases)
+1. Download the latest `.vsix` file from [Releases](https://github.com/therealgorgan/copilot-chat-history/releases)
 2. Open VS Code
 3. Go to Extensions (Ctrl+Shift+X)
 4. Click the "..." menu and select "Install from VSIX..."
@@ -154,4 +175,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Support
 
-If you encounter any issues or have feature requests, please file them in the [GitHub Issues](https://github.com/your-username/copilot-chat-history/issues).
+If you encounter any issues or have feature requests, please file them in the [GitHub Issues](https://github.com/therealgorgan/copilot-chat-history/issues).

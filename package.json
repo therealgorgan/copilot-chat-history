@@ -2,21 +2,21 @@
   "name": "copilot-chat-history",
   "displayName": "Copilot Chat History",
   "description": "View and manage your GitHub Copilot chat history organized by workspace with search and navigation features",
-  "version": "1.2.3",
-  "publisher": "arbuzov",
+  "version": "1.5.0",
+  "publisher": "therealgorgan",
   "license": "MIT",
   "author": {
-    "name": "Arbuzov",
-    "url": "https://github.com/arbuzov"
+    "name": "therealgorgan",
+    "url": "https://github.com/therealgorgan"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/arbuzov/copilot-chat-history.git"
+    "url": "https://github.com/therealgorgan/copilot-chat-history.git"
   },
   "bugs": {
-    "url": "https://github.com/arbuzov/copilot-chat-history/issues"
+    "url": "https://github.com/therealgorgan/copilot-chat-history/issues"
   },
-  "homepage": "https://github.com/arbuzov/copilot-chat-history#readme",
+  "homepage": "https://github.com/therealgorgan/copilot-chat-history#readme",
   "keywords": [
     "copilot",
     "chat",
@@ -55,6 +55,11 @@
         {
           "id": "copilotChatHistoryView",
           "name": "Chat Sessions",
+          "when": "true"
+        },
+        {
+          "id": "copilotArchiveView",
+          "name": "Archive",
           "when": "true"
         }
       ]
@@ -99,6 +104,91 @@
         "command": "copilotChatHistory.exportChatMarkdown",
         "title": "Export Chat as Markdown",
         "icon": "$(export)"
+      },
+      {
+        "command": "copilotChatHistory.exportWorkspaceConversations",
+        "title": "Export All Conversations",
+        "icon": "$(export)"
+      },
+      {
+        "command": "copilotChatHistory.exportSelectedConversations",
+        "title": "Export Selected Conversations",
+        "icon": "$(export)"
+      },
+      {
+        "command": "copilotChatHistory.deleteSelectedConversations",
+        "title": "Delete Selected Conversations",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "copilotChatHistory.deleteConversation",
+        "title": "Archive Conversation",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "copilotChatHistory.deleteConversationPermanently",
+        "title": "Delete Conversation (Permanent)",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "copilotChatHistory.deleteWorkspaceConversations",
+        "title": "Delete All Conversations in Workspace (Archive)",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "copilotChatHistory.deleteWorkspaceConversationsPermanently",
+        "title": "Delete All Conversations in Workspace (Permanent)",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "copilotChatHistory.emptyArchive",
+        "title": "Empty Archive",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "copilotChatHistory.restoreArchivedSession",
+        "title": "Restore Archived Conversation",
+        "icon": "$(restore)"
+      },
+      {
+        "command": "copilotChatHistory.deleteArchivedSession",
+        "title": "Delete Archived Conversation Permanently",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "copilotChatHistory.runAutoArchiveNow",
+        "title": "Run Auto-Archive Now",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "copilotChatHistory.openAutoArchiveSettings",
+        "title": "Auto-Archive Options",
+        "icon": "$(settings)"
+      },
+      {
+        "command": "copilotChatHistory.archiveConversation",
+        "title": "Archive",
+        "icon": "$(archive)"
+      },
+      {
+        "command": "copilotChatHistory.archiveAllConversations",
+        "title": "Archive All",
+        "icon": "$(archive)"
+      },
+      {
+        "command": "copilotChatHistory.unarchiveAllSessions",
+        "title": "Unarchive All",
+        "icon": "$(debug-restart)"
+      },
+      {
+        "command": "copilotChatHistory.loadMoreConversations",
+        "title": "Load More Conversations",
+        "icon": "$(ellipsis)"
+      },
+      {
+        "command": "copilotChatHistory.importChatSession",
+        "title": "Import Chat (Pre-load in Copilot)",
+        "icon": "$(debug-disconnect)"
       }
     ],
     "menus": {
@@ -117,23 +207,63 @@
           "command": "copilotChatHistory.refresh",
           "when": "view == copilotChatHistoryView",
           "group": "navigation@3"
+        },
+        {
+          "command": "copilotChatHistory.openAutoArchiveSettings",
+          "when": "view == copilotChatHistoryView",
+          "group": "navigation@4"
+        },
+        {
+          "command": "copilotChatHistory.emptyArchive",
+          "when": "view == copilotArchiveView",
+          "group": "navigation@1"
+        },
+        {
+          "command": "copilotChatHistory.runAutoArchiveNow",
+          "when": "view == copilotArchiveView",
+          "group": "navigation@2"
+        },
+        {
+          "command": "copilotChatHistory.openAutoArchiveSettings",
+          "when": "view == copilotArchiveView",
+          "group": "navigation@3"
         }
       ],
       "view/item/context": [
         {
           "command": "copilotChatHistory.openChat",
           "when": "view == copilotChatHistoryView && viewItem == chatSession",
-          "group": "chat@1"
+          "group": "inline@1"
+        },
+        {
+          "command": "copilotChatHistory.archiveConversation",
+          "when": "view == copilotChatHistoryView && viewItem == chatSession",
+          "group": "inline@2"
+        },
+        {
+          "command": "copilotChatHistory.deleteConversation",
+          "when": "view == copilotChatHistoryView && viewItem == chatSession",
+          "group": "inline@3"
+        },
+        {
+          "command": "copilotChatHistory.importChatSession",
+          "when": "view == copilotChatHistoryView && viewItem == chatSession",
+          "group": "context@1"
         },
         {
           "command": "copilotChatHistory.openChatJson",
           "when": "view == copilotChatHistoryView && viewItem == chatSession",
-          "group": "chat@2"
+          "group": "context@2"
         },
         {
           "command": "copilotChatHistory.exportChatMarkdown",
           "when": "view == copilotChatHistoryView && viewItem == chatSession",
-          "group": "chat@3"
+          "group": "context@3"
+        },
+        {
+          "command": "copilotChatHistory.deleteConversationPermanently",
+          "when": "view == copilotChatHistoryView && viewItem == chatSession",
+          "group": "context@4"
         },
         {
           "command": "copilotChatHistory.openWorkspaceInCurrentWindow",
@@ -144,8 +274,147 @@
           "command": "copilotChatHistory.openWorkspaceInNewWindow",
           "when": "view == copilotChatHistoryView && viewItem == workspaceGroup",
           "group": "inline@2"
+        },
+        {
+          "command": "copilotChatHistory.archiveAllConversations",
+          "when": "view == copilotChatHistoryView && viewItem == workspaceGroup",
+          "group": "inline@3"
+        },
+        {
+          "command": "copilotChatHistory.deleteWorkspaceConversations",
+          "when": "view == copilotChatHistoryView && viewItem == workspaceGroup",
+          "group": "inline@4"
+        },
+        {
+          "command": "copilotChatHistory.exportWorkspaceConversations",
+          "when": "view == copilotChatHistoryView && viewItem == workspaceGroup",
+          "group": "context@1"
+        },
+        {
+          "command": "copilotChatHistory.deleteWorkspaceConversationsPermanently",
+          "when": "view == copilotChatHistoryView && viewItem == workspaceGroup",
+          "group": "context@2"
+        },
+        {
+          "command": "copilotChatHistory.restoreArchivedSession",
+          "when": "view == copilotArchiveView && viewItem == archivedSession",
+          "group": "inline@1"
+        },
+        {
+          "command": "copilotChatHistory.importChatSession",
+          "when": "view == copilotArchiveView && viewItem == archivedSession",
+          "group": "inline@2"
+        },
+        {
+          "command": "copilotChatHistory.deleteArchivedSession",
+          "when": "view == copilotArchiveView && viewItem == archivedSession",
+          "group": "inline@3"
+        },
+        {
+          "command": "copilotChatHistory.restoreArchivedSession",
+          "when": "view == copilotArchiveView && viewItem == archivedSession",
+          "group": "context@1"
+        },
+        {
+          "command": "copilotChatHistory.importChatSession",
+          "when": "view == copilotArchiveView && viewItem == archivedSession",
+          "group": "context@2"
+        },
+        {
+          "command": "copilotChatHistory.deleteArchivedSession",
+          "when": "view == copilotArchiveView && viewItem == archivedSession",
+          "group": "context@3"
+        },
+        {
+          "command": "copilotChatHistory.unarchiveAllSessions",
+          "when": "view == copilotArchiveView && viewItem == archiveGroup",
+          "group": "inline@1"
+        },
+        {
+          "command": "copilotChatHistory.emptyArchive",
+          "when": "view == copilotArchiveView && viewItem == archiveGroup",
+          "group": "inline@2"
+        },
+        {
+          "command": "copilotChatHistory.unarchiveAllSessions",
+          "when": "view == copilotArchiveView && viewItem == archiveGroup",
+          "group": "context@1"
+        },
+        {
+          "command": "copilotChatHistory.emptyArchive",
+          "when": "view == copilotArchiveView && viewItem == archiveGroup",
+          "group": "context@2"
         }
       ]
+    }
+    ,
+    "configuration": {
+      "type": "object",
+      "title": "Copilot Chat History Settings (Fork)",
+      "properties": {
+        "copilotChatHistory.autoPurge.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable automatic emptying (purge) of archived conversations on a schedule."
+        },
+        "copilotChatHistory.autoPurge.days": {
+          "type": "number",
+          "default": 90,
+          "description": "Default retention period in days; archives older than this will be eligible for automatic purge when auto-purge runs."
+        },
+        "copilotChatHistory.autoPurge.checkIntervalHours": {
+          "type": "number",
+          "default": 24,
+          "description": "How often (in hours) to check and run the auto-purge job when enabled."
+        },
+        "copilotChatHistory.autoArchive.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically archive (or delete) oldest conversations when a workspace exceeds the configured session limit."
+        },
+        "copilotChatHistory.autoArchive.maxSessions": {
+          "type": "number",
+          "default": 200,
+          "description": "Maximum number of chat sessions to keep per workspace before auto-archiving/deleting oldest sessions."
+        },
+        "copilotChatHistory.autoArchive.action": {
+          "type": "string",
+          "enum": ["archive", "delete"],
+          "default": "archive",
+          "description": "When auto-archiving triggers, perform either 'archive' (move to extension archive) or 'delete' (send permanently to OS recycle bin)."
+        },
+        "copilotChatHistory.autoArchive.checkIntervalHours": {
+          "type": "number",
+          "default": 24,
+          "description": "How often (in hours) to check for workspace overflow and perform auto-archive/delete when enabled."
+        },
+        "copilotChatHistory.autoArchive.scope": {
+          "type": "string",
+          "enum": ["allWorkspaces", "currentWorkspace"],
+          "default": "allWorkspaces",
+          "description": "When set to 'allWorkspaces' the extension will monitor all known workspaces. When set to 'currentWorkspace' it will only monitor the active workspace."
+        },
+        "copilotChatHistory.autoArchive.leaderElectionEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable leader election to ensure only one VS Code instance performs auto-archival across multiple windows."
+        },
+        "copilotChatHistory.autoArchive.lockTTLSeconds": {
+          "type": "number",
+          "default": 120,
+          "description": "Seconds after which a master lock is considered expired if no heartbeat is received."
+        },
+        "copilotChatHistory.autoArchive.heartbeatIntervalSeconds": {
+          "type": "number",
+          "default": 30,
+          "description": "How often (in seconds) the master instance should refresh its lock heartbeat."
+        },
+        "copilotChatHistory.autoArchive.leaderCheckIntervalSeconds": {
+          "type": "number",
+          "default": 10,
+          "description": "How often (in seconds) instances should check for leader availability and attempt to acquire the master role if available."
+        }
+      }
     }
   },
   "scripts": {
@@ -166,6 +435,9 @@
     "publish:ovsx": "npm run package && npx ovsx publish --no-dependencies",
     "publish:both": "npm run publish:vsce && npm run publish:ovsx",
     "verify": "npx @vscode/vsce ls && npx @vscode/vsce package --allow-missing-repository"
+  },
+  "dependencies": {
+    "trash": "^6.1.0"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
